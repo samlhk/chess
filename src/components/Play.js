@@ -17,6 +17,7 @@ for (let i = 0; i < 8; i++) {
   }
 }
 // todo: comments and code quality
+// todo: use constants for statuses
 
 const Play = () => {
   const [board, updateBoard] = useState([
@@ -250,7 +251,6 @@ const checkMovePossible = ({ board, fromRank, fromFile, toRank, toFile, piece, t
 
   let moves = possibleMoves(board, fromRank, fromFile, piece, turn)
 
-  // todo: functional programming
   for (let i = 0; i < moves.length; i++) {
     if (moves[i][0] === toRank && moves[i][1] === toFile) {
       return true
@@ -268,7 +268,6 @@ const possibleMoves = (board, rank, file, piece, turn) => {
 
   let moves = sensibleMoves(board, rank, file, piece)
 
-  // todo: functional programming
   for (let i=0; i < moves.length; i++) {
 
     let hypotheticalBoard = [[],[],[],[],[],[],[],[]];
@@ -292,7 +291,6 @@ const checkMoveSensible = ({ board, fromRank, fromFile, toRank, toFile, piece, i
   
   let moves = sensibleMoves(board, fromRank, fromFile, piece, ignoreCastling)
 
-  // todo: functional programming
   for (let i = 0; i < moves.length; i++) {
     if (moves[i][0] === toRank && moves[i][1] === toFile) {
       return true
@@ -671,7 +669,6 @@ const indicatePossibleMoves = (board, rank, file, piece, turn) => {
 
   let moves = possibleMoves(board, rank, file, piece, turn)
 
-  // todo: functional programming
   for (let i=0; i < moves.length; i++) {
       document.getElementById(moves[i][0].toString().concat(moves[i][1].toString())).style.backgroundColor = 'red'
   }
@@ -691,7 +688,6 @@ const resetBoardColors = () => {
 // References ///////////////////////////////////////////////
 /////////////////////////////////////////////////////////////
 
-// todo: find a better way to do this
 const wk = new King(1, 1)
 const wq = new Queen(1, 2)
 const wr1 = new Rook(1, 3)
