@@ -11,6 +11,11 @@ const Menu = () => {
         <Link to='/play'>
             <button className='btn btn-block btn-info'>Head to Head</button>
         </Link><br/>
+        
+        <Link to='/competitive'>
+          <button className='btn btn-block btn-success'>Competitive</button>
+        </Link><br/>
+        
         <button className='btn btn-block btn-dark'>Coming soon...</button>
 
         <Footer />

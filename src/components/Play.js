@@ -6,6 +6,7 @@ import Knight from './piece/Knight'
 import Rook from './piece/Rook'
 import Pawn from './piece/Pawn'
 import Panel from './Panel'
+import Selection from './Selection'
 
 let template = []
 for (let i = 0; i < 8; i++) {
@@ -17,7 +18,8 @@ for (let i = 0; i < 8; i++) {
   }
 }
 // todo: comments and code quality
-// todo: use constants for statuses
+// todo: flip board
+// todo: reset board
 
 const Play = () => {
   const [board, updateBoard] = useState([
@@ -31,9 +33,12 @@ const Play = () => {
     [3, 7, 5, 2, 1, 6, 8, 4]
   ])
 
+  // white: 1    black: -1
   const [turn, updateTurn] = useState(1)
-  const [status, updateStatus] = useState(0)
+  const [status, updateStatus] = useState(ONGOING)
   const [drawRequested, updateDrawRequested] = useState(0)
+  // [piece id, piece color]
+  const [promotedPieceInfo, updatePromotedPieceInfo] = useState([0, 0])
 
   const allowDrop = (e) => {
     e.preventDefault();
@@ -46,7 +51,7 @@ const Play = () => {
   const drop = (e, toCellId) => {
     e.preventDefault();
     resetBoardColors()
-    let pieceId = e.dataTransfer.getData('piece-id');
+    let pieceId = parseInt(e.dataTransfer.getData('piece-id'));
 
     let newBoard = [[],[],[],[],[],[],[],[]];
     for (let i=0; i < 8; i++) {
@@ -58,29 +63,36 @@ const Play = () => {
     let fromCellId = [-1, -1]
     for (let i = 0; i < 8; i++) {
       for (let j = 0; j < 8; j++) {
-        if (newBoard[i][j] === parseInt(pieceId)) {fromCellId = [i, j]}
+        if (newBoard[i][j] === pieceId) {fromCellId = [i, j]}
       }
     }
-    // todo: make variables of expressions
-    // check if the move is legal
+
+    const fromRank = fromCellId[0]
+    const fromFile = fromCellId[1]
+    const toRank = parseInt(toCellId[0])
+    const toFile = parseInt(toCellId[1])
+    const piece = parsePieceId[pieceId]
+
     let currentBoardInfo = {
       'board': newBoard,
-      'fromRank': fromCellId[0],
-      'fromFile': fromCellId[1],
-      'toRank': parseInt(toCellId[0]),
-      'toFile': parseInt(toCellId[1]),
-      'piece': parsePieceId[pieceId],
+      'fromRank': fromRank,
+      'fromFile': fromFile,
+      'toRank': toRank,
+      'toFile': toFile,
+      'piece': piece,
       'turn': turn,
     }
-    if (status === 0 && checkMovePossible(currentBoardInfo)) {
+
+    // check if the move is legal
+    if (status === ONGOING && checkMovePossible(currentBoardInfo)) {
 
         handleEnPassant(currentBoardInfo)
 
-        newBoard[fromCellId[0]][fromCellId[1]] = 0
-        newBoard[parseInt(toCellId[0])][parseInt(toCellId[1])] = parseInt(pieceId)
+        newBoard[fromRank][fromFile] = 0
+        newBoard[toRank][toFile] = pieceId
 
-        handlePromotion(pieceId, toCellId[0])
-        handleCastling(parsePieceId[pieceId], newBoard, parseInt(toCellId[0]), parseInt(toCellId[1]))
+        handlePromotion(pieceId, toRank)
+        handleCastling(piece, newBoard, toRank, toFile)
         resetDrawRequest()
 
         checkCheckmate(newBoard, turn * -1)
@@ -111,10 +123,10 @@ const Play = () => {
       }
     if (allMoves.length === 0) {
       if (inCheck({'board': board, 'color': turn})) {
-        updateStatus(turn === 1 ? 2 : 1)
+        updateStatus(turn === 1 ? BLACK_CHECKMATE : WHITE_CHECKMATE)
       }
       else {
-        updateStatus(5)
+        updateStatus(STALEMATE)
       }
       
     }
@@ -153,18 +165,18 @@ const Play = () => {
 
     // King v King
     if (whiteMinorCount === 0 && blackMinorCount === 0) {
-      updateStatus(7)
+      updateStatus(INSUFFICIENT)
       return
     }
     // King + minor v King
     if ((whiteMinorCount === 0 && blackMinorCount === 1) || (whiteMinorCount === 1 && blackMinorCount === 0)){
-      updateStatus(7)
+      updateStatus(INSUFFICIENT)
       return
     }
     // King + Bishop v King + Bishop (same color)
     if (whiteBishopCount === 1 && blackBishopCount === 1) {
       if (whiteBishop.bishopColor === blackBishop.bishopColor) {
-        updateStatus(7)
+        updateStatus(INSUFFICIENT)
         return
       }
     }
@@ -173,12 +185,12 @@ const Play = () => {
 
 
   const onResign = () => {
-    updateStatus(turn === 1 ? 4 : 3)
+    updateStatus(turn === 1 ? WHITE_RESIGN : BLACK_RESIGN)
   }
 
   const onDraw = () => {
     if (drawRequested === turn * -1) {
-      updateStatus(6)
+      updateStatus(AGREEMENT)
     } else if (drawRequested === 0) {
       updateDrawRequested(turn)
     }
@@ -188,6 +200,41 @@ const Play = () => {
     if (drawRequested === turn * -1) {
       updateDrawRequested(0)
     }
+  }
+
+
+  const handlePromotion = (pieceId, toRank) => {
+    let piece = parsePieceId[pieceId]
+    if (piece instanceof Pawn) {
+      if (toRank === (piece.color === 1 ? 0 : 7)) {
+        updateStatus(SELECTING)
+        updatePromotedPieceInfo([pieceId, piece.color])
+      }
+    }
+  }
+
+
+  const resolvePromotion = (promotion) => {
+    const pieceId = promotedPieceInfo[0]
+    const pieceColor = promotedPieceInfo[1]
+    switch (promotion) {
+      case 'q':
+        parsePieceId[pieceId] = new Queen(pieceColor, pieceId)
+        break
+      case 'r':
+        parsePieceId[pieceId] = new Rook(pieceColor, pieceId)
+        break
+      case 'b':
+        parsePieceId[pieceId] = new Bishop(pieceColor, pieceId)
+        break
+      case 'n':
+        parsePieceId[pieceId] = new Knight(pieceColor, pieceId)
+        break
+      default:
+        break
+    }
+    updateStatus(ONGOING)
+    checkCheckmate(board, turn)
   }
 
 
@@ -212,7 +259,7 @@ const Play = () => {
                   if (pieceId > 0) {return (
                   <img src={parsePieceId[pieceId].render()}  alt=''
                     draggable onDragStart={(e) => {drag(e, pieceId); indicatePossibleMoves(board, 
-                      parseInt(cell.id[0]), parseInt(cell.id[1]), parsePieceId[pieceId], turn)}}
+                      parseInt(cell.id[0]), parseInt(cell.id[1]), parsePieceId[pieceId], turn, status)}}
                     onDragEnd={resetBoardColors} />)}}
                     )()}
 
@@ -228,9 +275,11 @@ const Play = () => {
         <div>
           {(() => {
               switch(status) {
-                case 0:
+                case ONGOING:
                   return (<Panel turn={turn} onResign={onResign}
                     drawRequested={drawRequested} onDraw={onDraw}/>)
+                case SELECTING:
+                  return (<Selection turn={turn * -1} onResolve={resolvePromotion} />)
                 default:
                   return (<div id='end-game'>{endGameMessages[status]}</div>)
               }
@@ -465,17 +514,6 @@ const sensibleQueenMoves = (board, fromRank, fromFile, piece) => {
 }
 
 
-const handlePromotion = (pieceId, toRank) => {
-  let piece = parsePieceId[pieceId]
-  if (piece instanceof Pawn) {
-    if (parseInt(toRank) === (piece.color === 1 ? 0 : 7)) {
-      // todo: prompt the player to choose what piece to promote to
-      parsePieceId[pieceId] = new Queen(piece.color, pieceId)
-    }
-  }
-}
-
-
 const handleCastling = (piece, board, toRank, toFile) => {
   if (piece instanceof King || piece instanceof Rook) {
     piece.haveMoved = true
@@ -665,12 +703,14 @@ const canLandOn = (board, rank, file, piece, pawnMove, pawnTake) => {
 /////////////////////////////////////////////////////////////
 
 
-const indicatePossibleMoves = (board, rank, file, piece, turn) => {
+const indicatePossibleMoves = (board, rank, file, piece, turn, status) => {
 
-  let moves = possibleMoves(board, rank, file, piece, turn)
+  if (status === ONGOING) {
+    let moves = possibleMoves(board, rank, file, piece, turn)
 
-  for (let i=0; i < moves.length; i++) {
-      document.getElementById(moves[i][0].toString().concat(moves[i][1].toString())).style.backgroundColor = 'red'
+    for (let i=0; i < moves.length; i++) {
+        document.getElementById(moves[i][0].toString().concat(moves[i][1].toString())).style.backgroundColor = 'red'
+    }
   }
 }
 
@@ -737,3 +777,14 @@ const endGameMessages = [
   'Draw by Insufficient Material',
   'todo: Draw by Repetition'
 ]
+
+const ONGOING = 0
+const WHITE_CHECKMATE = 1
+const BLACK_CHECKMATE = 2
+const BLACK_RESIGN = 3
+const WHITE_RESIGN = 4
+const STALEMATE = 5
+const AGREEMENT = 6
+const INSUFFICIENT = 7
+const REPETITION = 8
+const SELECTING = 9
