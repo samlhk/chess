@@ -19,20 +19,9 @@ for (let i = 0; i < 8; i++) {
 }
 // todo: comments and code quality
 // todo: flip board
-// todo: reset board
 
 const Play = () => {
-  const [board, updateBoard] = useState([
-    [19, 23, 21, 18, 17, 22, 24, 20],
-    [25, 26, 27, 28, 29, 30, 31, 32],
-    [0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0],
-    [9, 10, 11, 12, 13, 14, 15, 16],
-    [3, 7, 5, 2, 1, 6, 8, 4]
-  ])
-
+  const [board, updateBoard] = useState(startingPosition)
   // white: 1    black: -1
   const [turn, updateTurn] = useState(1)
   const [status, updateStatus] = useState(ONGOING)
@@ -238,6 +227,15 @@ const Play = () => {
   }
 
 
+  const resetBoard = () => {
+    updateBoard(startingPosition)
+    updateTurn(1)
+    updateStatus(ONGOING)
+    updateDrawRequested(0)
+    updatePromotedPieceInfo([0, 0])
+  }
+
+
   return (
     <div id='play-wrapper'>
       <div id='play-area'>
@@ -281,7 +279,10 @@ const Play = () => {
                 case SELECTING:
                   return (<Selection turn={turn * -1} onResolve={resolvePromotion} />)
                 default:
-                  return (<div id='end-game'>{endGameMessages[status]}</div>)
+                  return (<div id='end-game'>
+                            <div>{endGameMessages[status]}</div>
+                            <button id='reset-btn' onClick={resetBoard}><i class='fa fa-refresh'></i></button>
+                          </div>)
               }
           })()}
         </div>
@@ -767,6 +768,17 @@ const parsePieceId = [
   bk, bq, br1, br2, bb1, bb2, bn1, bn2, bp1, bp2, bp3, bp4, bp5, bp6, bp7, bp8
 ]
 
+const startingPosition = [
+  [19, 23, 21, 18, 17, 22, 24, 20],
+  [25, 26, 27, 28, 29, 30, 31, 32],
+  [0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0],
+  [9, 10, 11, 12, 13, 14, 15, 16],
+  [3, 7, 5, 2, 1, 6, 8, 4]
+]
+
 const endGameMessages = [
   , 'Checkmate, White Win',
   'Checkmate, Black Win',
@@ -775,7 +787,6 @@ const endGameMessages = [
   'Draw by Stalemate',
   'Draw by Agreement',
   'Draw by Insufficient Material',
-  'todo: Draw by Repetition'
 ]
 
 const ONGOING = 0
@@ -786,5 +797,4 @@ const WHITE_RESIGN = 4
 const STALEMATE = 5
 const AGREEMENT = 6
 const INSUFFICIENT = 7
-const REPETITION = 8
-const SELECTING = 9
+const SELECTING = 8
