@@ -8,17 +8,16 @@ import Pawn from './piece/Pawn'
 import Panel from './Panel'
 import Selection from './Selection'
 
-let template = []
+let boardTemplate = []
 for (let i = 0; i < 8; i++) {
   for (let j = 0; j < 8; j++) {
-    template.push({
+    boardTemplate.push({
       'id': i.toString().concat(j.toString()),
       'isWhite': (i + j) % 2 === 0 ? true : false,
     })
   }
 }
 // todo: comments and code quality
-// todo: flip board
 
 const Play = () => {
   const [board, updateBoard] = useState(startingPosition)
@@ -28,6 +27,7 @@ const Play = () => {
   const [drawRequested, updateDrawRequested] = useState(0)
   // [piece id, piece color]
   const [promotedPieceInfo, updatePromotedPieceInfo] = useState([0, 0])
+  const [perspective, updatePerspective] = useState(1)
 
   const allowDrop = (e) => {
     e.preventDefault();
@@ -236,6 +236,11 @@ const Play = () => {
   }
 
 
+  const flipBoard = () => {
+    updatePerspective(perspective * -1)
+  }
+
+
   return (
     <div id='play-wrapper'>
       <div id='play-area'>
@@ -247,23 +252,24 @@ const Play = () => {
             <div>0</div><div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div><div>7</div>
           </div>
           <div id='board'>
-          {template.map((cell) => (
+          {boardTemplate.map((cell) => {
 
-              <div className={`cell ${cell.isWhite ? 'white-cell' : 'black-cell'} `} id={cell.id} key={cell.id}
-                onDragOver={(e) => {allowDrop(e)}} onDrop={(e) => {drop(e, cell.id)}} >
+              const cellId = perspective === 1 ? cell.id : 
+              (7 - parseInt(cell.id[0])).toString().concat((7 - parseInt(cell.id[1])).toString())
+
+              return (<div className={`cell ${cell.isWhite ? 'white-cell' : 'black-cell'} `} id={cellId} key={cellId}
+                onDragOver={(e) => {allowDrop(e)}} onDrop={(e) => {drop(e, cellId)}} >
 
                   {(() => {
-                    let pieceId = board[parseInt(cell.id[0])][parseInt(cell.id[1])]
+                    let pieceId = board[parseInt(cellId[0])][parseInt(cellId[1])]
                   if (pieceId > 0) {return (
                   <img src={parsePieceId[pieceId].render()}  alt=''
                     draggable onDragStart={(e) => {drag(e, pieceId); indicatePossibleMoves(board, 
-                      parseInt(cell.id[0]), parseInt(cell.id[1]), parsePieceId[pieceId], turn, status)}}
+                      parseInt(cellId[0]), parseInt(cellId[1]), parsePieceId[pieceId], turn, status)}}
                     onDragEnd={resetBoardColors} />)}}
                     )()}
 
-              </div>
-
-          ))}
+              </div>)})}
 
           </div>
         </div>
@@ -281,10 +287,15 @@ const Play = () => {
                 default:
                   return (<div id='end-game'>
                             <div>{endGameMessages[status]}</div>
-                            <button id='reset-btn' onClick={resetBoard}><i class='fa fa-refresh'></i></button>
+                            <button className='board-control-btn' onClick={resetBoard}>
+                              <i className='fa fa-refresh' />
+                            </button>
                           </div>)
               }
           })()}
+          <button className='board-control-btn' onClick={flipBoard}>
+            <i className='fa fa-exchange fa-3x fa-rotate-90'/>
+          </button>
         </div>
       </div>
     </div>

@@ -100,7 +100,7 @@ img {
   transform: scale(0.98);
 }
 
-#reset-btn {
+.board-control-btn {
   background-color: #CE8646;
   border: none;
 }
