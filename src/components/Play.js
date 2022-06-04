@@ -8,38 +8,37 @@ import Pawn from './piece/Pawn'
 import Panel from './Panel'
 import Selection from './Selection'
 
-let boardTemplate = []
-for (let i = 0; i < 8; i++) {
-  for (let j = 0; j < 8; j++) {
-    boardTemplate.push({
-      'id': i.toString().concat(j.toString()),
-      'isWhite': (i + j) % 2 === 0 ? true : false,
-    })
-  }
-}
-// todo: comments and code quality
-
 const Play = () => {
   const [board, updateBoard] = useState(startingPosition)
+
   // white: 1    black: -1
   const [turn, updateTurn] = useState(1)
+
   const [status, updateStatus] = useState(ONGOING)
+
+  // color of player making the draw request
   const [drawRequested, updateDrawRequested] = useState(0)
+
   // [piece id, piece color]
   const [promotedPieceInfo, updatePromotedPieceInfo] = useState([0, 0])
+
   const [perspective, updatePerspective] = useState(1)
 
-  const allowDrop = (e) => {
-    e.preventDefault();
+  // behavior when dragging over cells
+  const onDragOver = (e) => {
+    e.preventDefault()
   }
   
-  const drag = (e, pieceId) => {
-    e.dataTransfer.setData('piece-id', pieceId);
+  // record the identity of the piece
+  const onDragStart = (e, pieceId) => {
+    e.dataTransfer.setData('piece-id', pieceId)
   }
   
+  // behavior when dropped onto final cell
   const drop = (e, toCellId) => {
-    e.preventDefault();
+    e.preventDefault()
     resetBoardColors()
+
     let pieceId = parseInt(e.dataTransfer.getData('piece-id'));
 
     let newBoard = [[],[],[],[],[],[],[],[]];
@@ -49,6 +48,7 @@ const Play = () => {
       }
     }
 
+    // find the cell the piece is coming from
     let fromCellId = [-1, -1]
     for (let i = 0; i < 8; i++) {
       for (let j = 0; j < 8; j++) {
@@ -77,11 +77,13 @@ const Play = () => {
 
         handleEnPassant(currentBoardInfo)
 
+        // make the move on the board
         newBoard[fromRank][fromFile] = 0
         newBoard[toRank][toFile] = pieceId
 
         handlePromotion(pieceId, toRank)
         handleCastling(piece, newBoard, toRank, toFile)
+
         resetDrawRequest()
 
         checkCheckmate(newBoard, turn * -1)
@@ -90,9 +92,7 @@ const Play = () => {
         updateTurn(turn * -1)
       }
 
-    updateBoard(newBoard)
-
-    
+    updateBoard(newBoard)    
   }
 
   const checkCheckmate = (board, turn) => {
@@ -172,7 +172,6 @@ const Play = () => {
 
   }
 
-
   const onResign = () => {
     updateStatus(turn === 1 ? WHITE_RESIGN : BLACK_RESIGN)
   }
@@ -191,7 +190,7 @@ const Play = () => {
     }
   }
 
-
+  // prompt the player to choose the promoted piece if needed
   const handlePromotion = (pieceId, toRank) => {
     let piece = parsePieceId[pieceId]
     if (piece instanceof Pawn) {
@@ -202,7 +201,7 @@ const Play = () => {
     }
   }
 
-
+  // put down the promoted piece indicated by the player
   const resolvePromotion = (promotion) => {
     const pieceId = promotedPieceInfo[0]
     const pieceColor = promotedPieceInfo[1]
@@ -228,6 +227,7 @@ const Play = () => {
 
 
   const resetBoard = () => {
+    setStartingPieces()
     updateBoard(startingPosition)
     updateTurn(1)
     updateStatus(ONGOING)
@@ -238,18 +238,19 @@ const Play = () => {
 
   const flipBoard = () => {
     updatePerspective(perspective * -1)
+    rankLegend.reverse()
+    fileLegend.reverse()
   }
-
 
   return (
     <div id='play-wrapper'>
       <div id='play-area'>
         <div id='side-legend'>
-          <div>0</div><div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div><div>7</div>
+          {rankLegend.map((rank) => <div>{rank}</div>)}
         </div>
         <div>
           <div id='top-legend'>
-            <div>0</div><div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div><div>7</div>
+            {fileLegend.map((file) => <div>{file}</div>)}
           </div>
           <div id='board'>
           {boardTemplate.map((cell) => {
@@ -258,13 +259,13 @@ const Play = () => {
               (7 - parseInt(cell.id[0])).toString().concat((7 - parseInt(cell.id[1])).toString())
 
               return (<div className={`cell ${cell.isWhite ? 'white-cell' : 'black-cell'} `} id={cellId} key={cellId}
-                onDragOver={(e) => {allowDrop(e)}} onDrop={(e) => {drop(e, cellId)}} >
+                onDragOver={(e) => {onDragOver(e)}} onDrop={(e) => {drop(e, cellId)}} >
 
                   {(() => {
                     let pieceId = board[parseInt(cellId[0])][parseInt(cellId[1])]
                   if (pieceId > 0) {return (
                   <img src={parsePieceId[pieceId].render()}  alt=''
-                    draggable onDragStart={(e) => {drag(e, pieceId); indicatePossibleMoves(board, 
+                    draggable onDragStart={(e) => {onDragStart(e, pieceId); indicatePossibleMoves(board, 
                       parseInt(cellId[0]), parseInt(cellId[1]), parsePieceId[pieceId], turn, status)}}
                     onDragEnd={resetBoardColors} />)}}
                     )()}
@@ -348,6 +349,7 @@ const possibleMoves = (board, rank, file, piece, turn) => {
 }
 
 
+// does not consider checks
 const checkMoveSensible = ({ board, fromRank, fromFile, toRank, toFile, piece, ignoreCastling }) => {
   
   let moves = sensibleMoves(board, fromRank, fromFile, piece, ignoreCastling)
@@ -740,44 +742,66 @@ const resetBoardColors = () => {
 // References ///////////////////////////////////////////////
 /////////////////////////////////////////////////////////////
 
-const wk = new King(1, 1)
-const wq = new Queen(1, 2)
-const wr1 = new Rook(1, 3)
-const wr2 = new Rook(1, 4)
-const wb1 = new Bishop(1, 5, -1)
-const wb2 = new Bishop(1, 6, 1)
-const wn1 = new Knight(1, 7)
-const wn2 = new Knight(1, 8)
-const wp1 = new Pawn(1, 9)
-const wp2 = new Pawn(1, 10)
-const wp3 = new Pawn(1, 11)
-const wp4 = new Pawn(1, 12)
-const wp5 = new Pawn(1, 13)
-const wp6 = new Pawn(1, 14)
-const wp7 = new Pawn(1, 15)
-const wp8 = new Pawn(1, 16)
+let wk, wq, wr1, wr2, wb1, wb2, wn1, wn2, wp1, wp2, wp3, wp4, wp5, wp6, wp7, wp8;
+let bk, bq, br1, br2, bb1, bb2, bn1, bn2, bp1, bp2, bp3, bp4, bp5, bp6, bp7, bp8;
+let parsePieceId;
 
-const bk = new King(-1, 17)
-const bq = new Queen(-1, 18)
-const br1 = new Rook(-1, 19)
-const br2 = new Rook(-1, 20)
-const bb1 = new Bishop(-1, 21, 1)
-const bb2 = new Bishop(-1, 22, -1)
-const bn1 = new Knight(-1, 23)
-const bn2 = new Knight(-1, 24)
-const bp1 = new Pawn(-1, 25)
-const bp2 = new Pawn(-1, 26)
-const bp3 = new Pawn(-1, 27)
-const bp4 = new Pawn(-1, 28)
-const bp5 = new Pawn(-1, 29)
-const bp6 = new Pawn(-1, 30)
-const bp7 = new Pawn(-1, 31)
-const bp8 = new Pawn(-1, 32)
+const setStartingPieces = () => {
+  wk = new King(1, 1)
+  wq = new Queen(1, 2)
+  wr1 = new Rook(1, 3)
+  wr2 = new Rook(1, 4)
+  wb1 = new Bishop(1, 5, -1)
+  wb2 = new Bishop(1, 6, 1)
+  wn1 = new Knight(1, 7)
+  wn2 = new Knight(1, 8)
+  wp1 = new Pawn(1, 9)
+  wp2 = new Pawn(1, 10)
+  wp3 = new Pawn(1, 11)
+  wp4 = new Pawn(1, 12)
+  wp5 = new Pawn(1, 13)
+  wp6 = new Pawn(1, 14)
+  wp7 = new Pawn(1, 15)
+  wp8 = new Pawn(1, 16)
 
-const parsePieceId = [
-  , wk, wq, wr1, wr2, wb1, wb2, wn1, wn2, wp1, wp2, wp3, wp4, wp5, wp6, wp7, wp8,
-  bk, bq, br1, br2, bb1, bb2, bn1, bn2, bp1, bp2, bp3, bp4, bp5, bp6, bp7, bp8
-]
+  bk = new King(-1, 17)
+  bq = new Queen(-1, 18)
+  br1 = new Rook(-1, 19)
+  br2 = new Rook(-1, 20)
+  bb1 = new Bishop(-1, 21, 1)
+  bb2 = new Bishop(-1, 22, -1)
+  bn1 = new Knight(-1, 23)
+  bn2 = new Knight(-1, 24)
+  bp1 = new Pawn(-1, 25)
+  bp2 = new Pawn(-1, 26)
+  bp3 = new Pawn(-1, 27)
+  bp4 = new Pawn(-1, 28)
+  bp5 = new Pawn(-1, 29)
+  bp6 = new Pawn(-1, 30)
+  bp7 = new Pawn(-1, 31)
+  bp8 = new Pawn(-1, 32)
+
+  parsePieceId = [
+    , wk, wq, wr1, wr2, wb1, wb2, wn1, wn2, wp1, wp2, wp3, wp4, wp5, wp6, wp7, wp8,
+    bk, bq, br1, br2, bb1, bb2, bn1, bn2, bp1, bp2, bp3, bp4, bp5, bp6, bp7, bp8
+  ]
+}
+
+setStartingPieces()
+
+
+let boardTemplate = []
+for (let i = 0; i < 8; i++) {
+  for (let j = 0; j < 8; j++) {
+    boardTemplate.push({
+      'id': i.toString().concat(j.toString()),
+      'isWhite': (i + j) % 2 === 0 ? true : false,
+    })
+  }
+}
+
+const fileLegend = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+const rankLegend = ['8', '7', '6', '5', '4', '3', '2', '1']
 
 const startingPosition = [
   [19, 23, 21, 18, 17, 22, 24, 20],
