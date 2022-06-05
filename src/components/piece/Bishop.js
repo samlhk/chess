@@ -5,6 +5,7 @@ export default class Bishop extends Piece{
     constructor(color, id, bishopColor) {
         super(color, id)
         this.bishopColor = bishopColor
+        this.value = 3
     }
 
     render() {

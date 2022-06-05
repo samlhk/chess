@@ -5,6 +5,7 @@ export default class Pawn extends Piece{
     constructor(color, id) {
         super(color, id)
         this.canTakeByEnPassant = false
+        this.value = 1
     }
 
     render() {

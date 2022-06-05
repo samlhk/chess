@@ -5,6 +5,7 @@ export default class Rook extends Piece{
     constructor(color, id) {
         super(color, id)
         this.haveMoved = false
+        this.value = 5
     }
 
     render() {

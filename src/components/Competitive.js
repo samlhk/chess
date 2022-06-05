@@ -26,6 +26,7 @@ const Competitive = () => {
     if (status === ENGINE_TURN) {
       engineMove(turn)
       updateStatus(PLAYER_TURN)
+      // todo: this overwirtes a checkmate
     }
   })
 
@@ -225,7 +226,7 @@ const Competitive = () => {
       default:
         break
     }
-    // todo: deal with engine promoting and en passant
+    // todo: deal with engine promoting 
      updateStatus(ENGINE_TURN)
 
     checkCheckmate(board, turn)
@@ -259,23 +260,22 @@ const Competitive = () => {
   }
 
   const engineMove = (turn) => {
-    let allMoves = []
-    for (let i=0; i < 8; i++) {
-      for (let j=0; j < 8; j++) {
-        let pieceId = board[i][j]
-        if (pieceId > 0) {
-          let moves = possibleMoves(board, i, j, parsePieceId[pieceId], turn)
-          for (let z=0; z < moves.length; z++) {
-            allMoves.push([pieceId, moves[z]])
-          }
-        }
-      }
-    }
-    // an element of allMoves = [pieceId, [toRank, toFile]]
-    let [enginePieceId, move] = allMoves[Math.floor(Math.random() * allMoves.length)]
+
+    let [enginePieceId, move] = generateEngineMove(board, turn)
 
     drop(move[0].toString().concat(move[1].toString()), false, enginePieceId)
   }
+  /*
+  todo:
+  evaluate position
+  minimax
+  alpha beta pruning?
+  move ordering (capturing)?
+  search until no capturing possible
+  force king to side in end game
+  transpositions to increase computational speed and depth
+  opening preference/ download book moves
+  */
 
   return (
     <>
@@ -347,6 +347,134 @@ export default Competitive
 // Engine ///////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////
 
+const generateEngineMove = (board, turn) => {
+  
+  // todo: generalize this script
+  let allMoves = []
+  for (let i=0; i < 8; i++) {
+    for (let j=0; j < 8; j++) {
+      let pieceId = board[i][j]
+      if (pieceId > 0) {
+        let moves = possibleMoves(board, i, j, parsePieceId[pieceId], turn)
+        for (let z=0; z < moves.length; z++) {
+          allMoves.push([pieceId,[i, j, moves[z][0], moves[z][1]]])
+        }
+      }
+    }
+  }
+  // an element of allMoves = [pieceId, [fromRank, fromFile, toRank, toFile]] : all integers
+
+  let optimalMoveIndex = 0
+  let optimalMoveValue = -1 * turn * Infinity
+  for (let i=0; i < allMoves.length; i++) {
+    let hypotheticalBoard = [[],[],[],[],[],[],[],[]];
+    for (let i=0; i < 8; i++) {
+      for (let j = 0; j < 8; j++) {
+        hypotheticalBoard[i][j] = board[i][j]
+      }
+    }
+    let [pieceId, [fromRank, fromFile, toRank, toFile]] = allMoves[i]
+    // todo: account for special moves
+    hypotheticalBoard[fromRank][fromFile] = 0
+    hypotheticalBoard[toRank][toFile] = pieceId
+
+    if (turn === 1) {
+      let minimaxResult = minimax(hypotheticalBoard, turn * -1, 2, false)
+      if (minimaxResult > optimalMoveValue){
+        optimalMoveIndex = i
+        optimalMoveValue = minimaxResult
+      }
+    } else {
+      let minimaxResult = minimax(hypotheticalBoard, turn * -1, 2, true)
+      if (minimaxResult < optimalMoveValue){
+        optimalMoveIndex = i
+        optimalMoveValue = minimaxResult
+      }
+    }
+  }
+  let enginePieceId = allMoves[optimalMoveIndex][0]
+  let move = allMoves[optimalMoveIndex][1].slice(2, 4)
+  
+  return [enginePieceId, move]
+}
+
+// gives optimal value for this board position this turn
+const minimax = (board, turn, depth, maximizingPlayer) => {
+  
+  let allMoves = []
+  for (let i=0; i < 8; i++) {
+    for (let j=0; j < 8; j++) {
+      let pieceId = board[i][j]
+      if (pieceId > 0) {
+        let moves = possibleMoves(board, i, j, parsePieceId[pieceId], turn)
+        for (let z=0; z < moves.length; z++) {
+          allMoves.push([pieceId,[i, j, moves[z][0], moves[z][1]]])
+        }
+      }
+    }
+  }
+
+  if (depth === 0 || allMoves.length === 0) {
+    return evaluate(board)
+  }
+
+
+  if (maximizingPlayer) {
+    let value = -Infinity
+    for (let i=0; i < allMoves.length; i++) {
+      let hypotheticalBoard = [[],[],[],[],[],[],[],[]];
+      for (let i=0; i < 8; i++) {
+        for (let j = 0; j < 8; j++) {
+          hypotheticalBoard[i][j] = board[i][j]
+        }
+      }
+      let [pieceId, [fromRank, fromFile, toRank, toFile]] = allMoves[i]
+      // todo: account for special moves
+      hypotheticalBoard[fromRank][fromFile] = 0
+      hypotheticalBoard[toRank][toFile] = pieceId
+
+      value = Math.max(value, minimax(hypotheticalBoard, turn * -1, depth - 1, false))
+    }
+    return value
+  }
+  else {
+    let value = Infinity
+    for (let i=0; i < allMoves.length; i++) {
+      let hypotheticalBoard = [[],[],[],[],[],[],[],[]];
+      for (let i=0; i < 8; i++) {
+        for (let j = 0; j < 8; j++) {
+          hypotheticalBoard[i][j] = board[i][j]
+        }
+      }
+      let [pieceId, [fromRank, fromFile, toRank, toFile]] = allMoves[i]
+      // todo: account for special moves
+      hypotheticalBoard[fromRank][fromFile] = 0
+      hypotheticalBoard[toRank][toFile] = pieceId
+
+      value = Math.min(value, minimax(hypotheticalBoard, turn * -1, depth - 1, true))
+    }
+    return value
+  }
+}
+
+
+
+// evaluate the score for the position for WHITE
+const evaluate = (board) => {
+  if (isCheckmate(board, 1)) {return -Infinity}
+  if (isCheckmate(board, -1)) {return Infinity}
+
+  let score = 0
+  for (let i=0; i < 8; i++) {
+    for (let j=0; j < 8; j++) {
+      if (board[i][j] > 0) {
+        let piece = parsePieceId[board[i][j]]
+        score += piece.value * piece.color
+      }
+    }
+  }
+  return score
+}
 
 
 /////////////////////////////////////////////////////////////
@@ -384,6 +512,7 @@ const possibleMoves = (board, rank, file, piece, turn) => {
     }
     hypotheticalBoard[rank][file] = 0
     hypotheticalBoard[parseInt(moves[i][0])][parseInt(moves[i][1])] = parseInt(piece.id)
+    // todo: account for en passant discovered check in both scripts
 
     if (!inCheck({'board': hypotheticalBoard, 'color': turn})) {
       possibleMoves.push(moves[i])
@@ -697,6 +826,35 @@ const castlingMoves = (board, piece) => {
 
   return moves
 }
+
+// check if this color's king is getting mated
+const isCheckmate= (board, turn) => {
+  let allMoves = []
+  scanningBoard:
+    for (let i=0; i < 8; i++) {
+      for (let j=0; j < 8; j++) {
+        let pieceId = board[i][j]
+        if (pieceId > 0) {
+          let moves = possibleMoves(board, i, j, parsePieceId[pieceId], turn)
+          if (moves.length > 0) {
+            allMoves.push([pieceId, moves])
+            break scanningBoard
+          }
+        }
+      }
+    }
+  if (allMoves.length === 0) {
+    if (inCheck({'board': board, 'color': turn})) {
+      return true
+    }
+    else {
+      // todo: handle stalemate here later
+      return false
+    }
+  }
+  return false
+}
+
 
 // check if the color's king is in check
 const inCheck = ({ board, color }) => {

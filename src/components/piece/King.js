@@ -7,6 +7,7 @@ export default class King extends Piece{
         this.haveMoved = false
         this.shortCastlingApproved = false
         this.longCastlingApproved = false
+        this.value = 0
     }
 
     render() {
