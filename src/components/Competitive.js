@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import King from './piece/King'
 import Queen from './piece/Queen'
 import Bishop from './piece/Bishop'
@@ -7,22 +7,28 @@ import Rook from './piece/Rook'
 import Pawn from './piece/Pawn'
 import Panel from './Panel'
 import Selection from './Selection'
+import ChoosingMenu from './ChoosingMenu'
 
-const Play = () => {
+const Competitive = () => {
   const [board, updateBoard] = useState(startingPosition)
 
   // white: 1    black: -1
   const [turn, updateTurn] = useState(1)
 
-  const [status, updateStatus] = useState(ONGOING)
-
-  // color of player making the draw request
-  const [drawRequested, updateDrawRequested] = useState(0)
+  const [status, updateStatus] = useState(CHOOSING)
 
   // [piece id, piece color]
   const [promotedPieceInfo, updatePromotedPieceInfo] = useState([0, 0])
 
   const [perspective, updatePerspective] = useState(1)
+
+  useEffect(() => {
+    if (status === ENGINE_TURN) {
+      engineMove(turn)
+      updateStatus(PLAYER_TURN)
+    }
+  })
+
 
   // behavior when dragging over cells
   const onDragOver = (e) => {
@@ -35,12 +41,20 @@ const Play = () => {
   }
   
   // behavior when dropped onto final cell
-  const drop = (e, toCellId) => {
-    e.preventDefault()
-    resetBoardColors()
+  const drop = (toCellId, e, enginePieceId) => {
+    let pieceId
+    // player dropping the piece manually
+    if (e) {
+      e.preventDefault()
+      pieceId = parseInt(e.dataTransfer.getData('piece-id'))
+      resetBoardColors()
+    } 
+    // engine created drop piece
+    else {
+      pieceId = enginePieceId
+    }
 
-    let pieceId = parseInt(e.dataTransfer.getData('piece-id'));
-
+    
     let newBoard = [[],[],[],[],[],[],[],[]];
     for (let i=0; i < 8; i++) {
       for (let j = 0; j < 8; j++) {
@@ -73,7 +87,12 @@ const Play = () => {
     }
 
     // check if the move is legal
-    if (status === ONGOING && checkMovePossible(currentBoardInfo)) {
+    // todo: player can only move when their turn, might not be a problem if engine moves quick
+    if ((status === PLAYER_TURN || status === ENGINE_TURN) && checkMovePossible(currentBoardInfo)) {
+        // switch to engine's turn
+        if (status !== ENGINE_TURN) {
+          updateStatus(ENGINE_TURN)
+        }
 
         handleEnPassant(currentBoardInfo)
 
@@ -84,12 +103,11 @@ const Play = () => {
         handlePromotion(pieceId, toRank)
         handleCastling(piece, newBoard, toRank, toFile)
 
-        resetDrawRequest()
-
         checkCheckmate(newBoard, turn * -1)
         checkInsufficient(newBoard)
         
         updateTurn(turn * -1)
+
       }
 
     updateBoard(newBoard)    
@@ -176,20 +194,6 @@ const Play = () => {
     updateStatus(turn === 1 ? WHITE_RESIGN : BLACK_RESIGN)
   }
 
-  const onDraw = () => {
-    if (drawRequested === turn * -1) {
-      updateStatus(AGREEMENT)
-    } else if (drawRequested === 0) {
-      updateDrawRequested(turn)
-    }
-  }
-
-  const resetDrawRequest = () => {
-    if (drawRequested === turn * -1) {
-      updateDrawRequested(0)
-    }
-  }
-
   // prompt the player to choose the promoted piece if needed
   const handlePromotion = (pieceId, toRank) => {
     let piece = parsePieceId[pieceId]
@@ -221,7 +225,9 @@ const Play = () => {
       default:
         break
     }
-    updateStatus(ONGOING)
+    // todo: deal with engine promoting and en passant
+     updateStatus(ENGINE_TURN)
+
     checkCheckmate(board, turn)
   }
 
@@ -230,8 +236,7 @@ const Play = () => {
     setStartingPieces()
     updateBoard(startingPosition)
     updateTurn(1)
-    updateStatus(ONGOING)
-    updateDrawRequested(0)
+    updateStatus(CHOOSING)
     updatePromotedPieceInfo([0, 0])
   }
 
@@ -242,68 +247,107 @@ const Play = () => {
     fileLegend.reverse()
   }
 
+  const chooseSide = (color) => {
+    updatePerspective(color)
+
+    // set the first moving side
+    if (color === 1) {
+      updateStatus(PLAYER_TURN)
+    } else {
+      updateStatus(ENGINE_TURN)
+    }
+  }
+
+  const engineMove = (turn) => {
+    let allMoves = []
+    for (let i=0; i < 8; i++) {
+      for (let j=0; j < 8; j++) {
+        let pieceId = board[i][j]
+        if (pieceId > 0) {
+          let moves = possibleMoves(board, i, j, parsePieceId[pieceId], turn)
+          for (let z=0; z < moves.length; z++) {
+            allMoves.push([pieceId, moves[z]])
+          }
+        }
+      }
+    }
+    // an element of allMoves = [pieceId, [toRank, toFile]]
+    let [enginePieceId, move] = allMoves[Math.floor(Math.random() * allMoves.length)]
+
+    drop(move[0].toString().concat(move[1].toString()), false, enginePieceId)
+  }
+
   return (
-    <div id='play-wrapper'>
-      <div id='play-area'>
-        <div id='side-legend'>
-          {rankLegend.map((rank) => <div key={rank}>{rank}</div>)}
-        </div>
-        <div>
-          <div id='top-legend'>
-            {fileLegend.map((file) => <div key={file}>{file}</div>)}
+    <>
+      {status === CHOOSING ? <ChoosingMenu onChoose={chooseSide}/> :
+
+      <div id='play-wrapper'>
+        <div id='play-area'>
+          <div id='side-legend'>
+            {rankLegend.map((rank) => <div key={rank}>{rank}</div>)}
           </div>
-          <div id='board'>
-          {boardTemplate.map((cell) => {
+          <div>
+            <div id='top-legend'>
+              {fileLegend.map((file) => <div key={file}>{file}</div>)}
+            </div>
+            <div id='board'>
+            {boardTemplate.map((cell) => {
 
-              const cellId = perspective === 1 ? cell.id : 
-              (7 - parseInt(cell.id[0])).toString().concat((7 - parseInt(cell.id[1])).toString())
+                const cellId = perspective === 1 ? cell.id : 
+                (7 - parseInt(cell.id[0])).toString().concat((7 - parseInt(cell.id[1])).toString())
 
-              return (<div className={`cell ${cell.isWhite ? 'white-cell' : 'black-cell'} `} id={cellId} key={cellId}
-                onDragOver={(e) => {onDragOver(e)}} onDrop={(e) => {drop(e, cellId)}} >
+                return (<div className={`cell ${cell.isWhite ? 'white-cell' : 'black-cell'} `} id={cellId} key={cellId}
+                  onDragOver={(e) => {onDragOver(e)}} onDrop={(e) => {drop(cellId, e)}} >
 
-                  {(() => {
-                    let pieceId = board[parseInt(cellId[0])][parseInt(cellId[1])]
-                  if (pieceId > 0) {return (
-                  <img src={parsePieceId[pieceId].render()}  alt=''
-                    draggable onDragStart={(e) => {onDragStart(e, pieceId); indicatePossibleMoves(board, 
-                      parseInt(cellId[0]), parseInt(cellId[1]), parsePieceId[pieceId], turn, status)}}
-                    onDragEnd={resetBoardColors} />)}}
-                    )()}
+                    {(() => {
+                      let pieceId = board[parseInt(cellId[0])][parseInt(cellId[1])]
+                    if (pieceId > 0) {return (
+                    <img src={parsePieceId[pieceId].render()}  alt=''
+                      draggable onDragStart={(e) => {onDragStart(e, pieceId); indicatePossibleMoves(board, 
+                        parseInt(cellId[0]), parseInt(cellId[1]), parsePieceId[pieceId], turn, status)}}
+                      onDragEnd={resetBoardColors} />)}}
+                      )()}
 
-              </div>)})}
+                </div>)})}
 
+            </div>
           </div>
         </div>
-      </div>
 
-      <div id='panel'>
-        <div>
-          {(() => {
-              switch(status) {
-                case ONGOING:
-                  return (<Panel turn={turn} onResign={onResign}
-                    drawRequested={drawRequested} onDraw={onDraw}/>)
-                case SELECTING:
-                  return (<Selection turn={turn * -1} onResolve={resolvePromotion} />)
-                default:
-                  return (<div id='end-game'>
-                            <div>{endGameMessages[status]}</div>
-                            <button className='board-control-btn' onClick={resetBoard}>
-                              <i className='fa fa-refresh' />
-                            </button>
-                          </div>)
-              }
-          })()}
-          <button className='board-control-btn' onClick={flipBoard}>
-            <i className='fa fa-exchange fa-3x fa-rotate-90'/>
-          </button>
+        <div id='panel'>
+          <div>
+            {(() => {
+                switch(status) {
+                  case PLAYER_TURN:
+                    return (<Panel turn={turn} onResign={onResign}/>)
+                  case SELECTING:
+                    return (<Selection turn={turn * -1} onResolve={resolvePromotion} />)
+                  default:
+                    return (<div id='end-game'>
+                              <div>{endGameMessages[status]}</div>
+                              <button className='board-control-btn' onClick={resetBoard}>
+                                <i className='fa fa-refresh' />
+                              </button>
+                            </div>)
+                }
+            })()}
+            <button className='board-control-btn' onClick={flipBoard}>
+              <i className='fa fa-exchange fa-3x fa-rotate-90'/>
+            </button>
+          </div>
         </div>
-      </div>
-    </div>
+      </div>}
+    </>
   )
 }
 
-export default Play
+export default Competitive
+
+/////////////////////////////////////////////////////////////
+// Engine ///////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////
+
+
 
 /////////////////////////////////////////////////////////////
 // Logic ////////////////////////////////////////////////////
@@ -719,7 +763,7 @@ const canLandOn = (board, rank, file, piece, pawnMove, pawnTake) => {
 
 const indicatePossibleMoves = (board, rank, file, piece, turn, status) => {
 
-  if (status === ONGOING) {
+  if (status === PLAYER_TURN) {
     let moves = possibleMoves(board, rank, file, piece, turn)
 
     for (let i=0; i < moves.length; i++) {
@@ -800,8 +844,10 @@ for (let i = 0; i < 8; i++) {
   }
 }
 
-const fileLegend = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
-const rankLegend = ['8', '7', '6', '5', '4', '3', '2', '1']
+//const fileLegend = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+//const rankLegend = ['8', '7', '6', '5', '4', '3', '2', '1']
+const fileLegend = [7, 6, 5, 4, 3, 2, 1, 0]
+const rankLegend = [7, 6, 5, 4, 3, 2, 1, 0]
 
 const startingPosition = [
   [19, 23, 21, 18, 17, 22, 24, 20],
@@ -820,16 +866,16 @@ const endGameMessages = [
   'Black Resigns, White Win',
   'White Resigns, Black Win',
   'Draw by Stalemate',
-  'Draw by Agreement',
   'Draw by Insufficient Material',
 ]
 
-const ONGOING = 0
+const PLAYER_TURN = 0
 const WHITE_CHECKMATE = 1
 const BLACK_CHECKMATE = 2
 const BLACK_RESIGN = 3
 const WHITE_RESIGN = 4
 const STALEMATE = 5
-const AGREEMENT = 6
-const INSUFFICIENT = 7
-const SELECTING = 8
+const INSUFFICIENT = 6
+const SELECTING = 7
+const CHOOSING = 8
+const ENGINE_TURN = 9

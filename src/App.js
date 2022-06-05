@@ -1,7 +1,7 @@
 import { HashRouter as Router, Route} from 'react-router-dom'
 import Menu from './components/Menu'
 import Play from './components/Play'
-//import Competitive from './components/Competitive';
+import Competitive from './components/Competitive';
 
 
 function App() {
@@ -13,7 +13,7 @@ function App() {
 
         <Route path='/play' component={Play}/>
 
-        {/*<Route path='/competitive' component={Competitive}/>*/}
+        {<Route path='/competitive' component={Competitive}/>}
 
       </div>
     </Router>
