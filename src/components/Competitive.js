@@ -271,6 +271,7 @@ const Competitive = () => {
   minimax
   alpha beta pruning?
   move ordering (capturing)?
+
   search until no capturing possible
   force king to side in end game
   transpositions to increase computational speed and depth
@@ -348,6 +349,7 @@ export default Competitive
 /////////////////////////////////////////////////////////////
 
 const generateEngineMove = (board, turn) => {
+  // todo: use minimax from the start ---> track the last inputted choice?/ at surface depth
   
   // todo: generalize this script
   let allMoves = []
@@ -374,18 +376,18 @@ const generateEngineMove = (board, turn) => {
       }
     }
     let [pieceId, [fromRank, fromFile, toRank, toFile]] = allMoves[i]
-    // todo: account for special moves
+    // todo: account for special moves x3
     hypotheticalBoard[fromRank][fromFile] = 0
     hypotheticalBoard[toRank][toFile] = pieceId
 
     if (turn === 1) {
-      let minimaxResult = minimax(hypotheticalBoard, turn * -1, 2, false)
+      let minimaxResult = minimax(hypotheticalBoard, turn * -1, 3, -Infinity, Infinity, false)
       if (minimaxResult > optimalMoveValue){
         optimalMoveIndex = i
         optimalMoveValue = minimaxResult
       }
     } else {
-      let minimaxResult = minimax(hypotheticalBoard, turn * -1, 2, true)
+      let minimaxResult = minimax(hypotheticalBoard, turn * -1, 3, -Infinity, Infinity, true)
       if (minimaxResult < optimalMoveValue){
         optimalMoveIndex = i
         optimalMoveValue = minimaxResult
@@ -398,21 +400,42 @@ const generateEngineMove = (board, turn) => {
   return [enginePieceId, move]
 }
 
+// todo: investigate this function
 // gives optimal value for this board position this turn
-const minimax = (board, turn, depth, maximizingPlayer) => {
+const minimax = (board, turn, depth, alpha, beta, maximizingPlayer) => {
   
   let allMoves = []
+  let capturePiece = []
+  let capturePawn = []
+  let walkIntoPawn = []
+  let regularMoves = []
   for (let i=0; i < 8; i++) {
     for (let j=0; j < 8; j++) {
       let pieceId = board[i][j]
       if (pieceId > 0) {
         let moves = possibleMoves(board, i, j, parsePieceId[pieceId], turn)
         for (let z=0; z < moves.length; z++) {
-          allMoves.push([pieceId,[i, j, moves[z][0], moves[z][1]]])
+          let moveInformation = [pieceId,[i, j, moves[z][0], moves[z][1]]]
+          
+          // order moves with human intuition
+          // capture piece -> capture pawn -> ... -> move into pawn captured
+          if (doesCapturePiece(board, moves[z])) {
+            capturePiece.push(moveInformation)
+          } 
+          else if (doesCapturePawn(board, moves[z])) {
+            capturePawn.push(moveInformation)
+          } 
+          else if (doesWalkIntoPawn(board, moves[z])) {
+            walkIntoPawn.push(moveInformation)
+          }
+          else {
+            regularMoves.push(moveInformation)
+          }
         }
       }
     }
   }
+  allMoves = capturePiece.concat(capturePawn).concat(regularMoves).concat(walkIntoPawn)
 
   if (depth === 0 || allMoves.length === 0) {
     return evaluate(board)
@@ -429,11 +452,15 @@ const minimax = (board, turn, depth, maximizingPlayer) => {
         }
       }
       let [pieceId, [fromRank, fromFile, toRank, toFile]] = allMoves[i]
-      // todo: account for special moves
+      // todo: account for special moves x3
       hypotheticalBoard[fromRank][fromFile] = 0
       hypotheticalBoard[toRank][toFile] = pieceId
 
-      value = Math.max(value, minimax(hypotheticalBoard, turn * -1, depth - 1, false))
+      value = Math.max(value, minimax(hypotheticalBoard, turn * -1, depth - 1, alpha, beta, false))
+      alpha = Math.max(alpha, value)
+      if (value >= beta) {
+        break
+      }
     }
     return value
   }
@@ -447,14 +474,37 @@ const minimax = (board, turn, depth, maximizingPlayer) => {
         }
       }
       let [pieceId, [fromRank, fromFile, toRank, toFile]] = allMoves[i]
-      // todo: account for special moves
+      // todo: account for special moves x3
       hypotheticalBoard[fromRank][fromFile] = 0
       hypotheticalBoard[toRank][toFile] = pieceId
 
-      value = Math.min(value, minimax(hypotheticalBoard, turn * -1, depth - 1, true))
+      value = Math.min(value, minimax(hypotheticalBoard, turn * -1, depth - 1, alpha, beta, true))
+      beta = Math.min(beta, value)
+      if (value <= alpha) {
+        break
+      }
     }
     return value
   }
+}
+
+
+const doesCapturePiece = (board, [toRank, toFile]) => {
+  if (board[toRank][toFile] > 0 && parsePieceId[board[toRank][toFile]].value >= 3) {
+    return true
+  }
+  return false
+}
+
+const doesCapturePawn = (board, [toRank, toFile]) => {
+  if (board[toRank][toFile] > 0 && parsePieceId[board[toRank][toFile]].value === 3) {
+    return true
+  }
+  return false
+}
+
+const doesWalkIntoPawn = (board, [toRank, toFile]) => {
+  return false
 }
 
 
