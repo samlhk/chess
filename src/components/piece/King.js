@@ -8,6 +8,16 @@ export default class King extends Piece{
         this.shortCastlingApproved = false
         this.longCastlingApproved = false
         this.value = 0
+        this.openingBonus = [
+            [0, 0, 10, 0, 0, 0, 10, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+        ]
     }
 
     render() {

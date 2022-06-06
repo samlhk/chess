@@ -6,6 +6,16 @@ export default class Rook extends Piece{
         super(color, id)
         this.haveMoved = false
         this.value = 5
+        this.openingBonus = [
+            [0, 0, 0, 5, 0, 5, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+        ]
     }
 
     render() {

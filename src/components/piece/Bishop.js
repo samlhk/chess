@@ -6,6 +6,16 @@ export default class Bishop extends Piece{
         super(color, id)
         this.bishopColor = bishopColor
         this.value = 3
+        this.openingBonus = [
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 6, 0, 0, 0, 0, 6, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 4, 7, 9, 9, 7, 4, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+        ]
     }
 
     render() {

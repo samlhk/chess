@@ -22,6 +22,8 @@ const Competitive = () => {
 
   const [perspective, updatePerspective] = useState(1)
 
+  const [moveNumber, updateMoveNumber] = useState(1)
+
   useEffect(() => {
     if (status === ENGINE_TURN) {
       engineMove(turn)
@@ -93,6 +95,10 @@ const Competitive = () => {
         // switch to engine's turn
         if (status !== ENGINE_TURN) {
           updateStatus(ENGINE_TURN)
+        }
+
+        if (turn === -1) {
+          updateMoveNumber(moveNumber + 1)
         }
 
         handleEnPassant(currentBoardInfo)
@@ -238,6 +244,7 @@ const Competitive = () => {
     updateBoard(startingPosition)
     updateTurn(1)
     updateStatus(CHOOSING)
+    updateMoveNumber(1)
     updatePromotedPieceInfo([0, 0])
   }
 
@@ -261,7 +268,7 @@ const Competitive = () => {
 
   const engineMove = (turn) => {
 
-    let [enginePieceId, move] = generateEngineMove(board, turn)
+    let [enginePieceId, move] = generateEngineMove(board, turn, moveNumber)
 
     drop(move[0].toString().concat(move[1].toString()), false, enginePieceId)
   }
@@ -271,11 +278,12 @@ const Competitive = () => {
   minimax
   alpha beta pruning?
   move ordering (capturing)?
+  opening preference
 
   search until no capturing possible
   force king to side in end game
   transpositions to increase computational speed and depth
-  opening preference/ download book moves
+  
   */
 
   return (
@@ -317,6 +325,7 @@ const Competitive = () => {
 
         <div id='panel'>
           <div>
+            <h1>Move: {moveNumber}</h1>
             {(() => {
                 switch(status) {
                   case PLAYER_TURN:
@@ -348,11 +357,11 @@ export default Competitive
 // Engine ///////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////
 
-const generateEngineMove = (board, turn) => {
+const generateEngineMove = (board, turn, moveNumber) => {
 
   optimalEngineMove = [-1, [0, 0, 0, 0]]
 
-  minimax(board, turn, ENGINE_DEPTH, -Infinity, Infinity, turn === 1 ? true: false)
+  console.log(minimax(board, turn, ENGINE_DEPTH, -Infinity, Infinity, turn === 1 ? true: false, moveNumber))
 
   let enginePieceId = optimalEngineMove[0]
   let move = optimalEngineMove[1].slice(2, 4)
@@ -362,12 +371,11 @@ const generateEngineMove = (board, turn) => {
 
 // todo: investigate this function
 // gives optimal value for this board position this turn
-const minimax = (board, turn, depth, alpha, beta, maximizingPlayer) => {
+const minimax = (board, turn, depth, alpha, beta, maximizingPlayer, moveNumber) => {
   
   let allMoves = []
   let capturePiece = []
   let capturePawn = []
-  let walkIntoPawn = []
   let regularMoves = []
   for (let i=0; i < 8; i++) {
     for (let j=0; j < 8; j++) {
@@ -378,16 +386,13 @@ const minimax = (board, turn, depth, alpha, beta, maximizingPlayer) => {
           let moveInformation = [pieceId,[i, j, moves[z][0], moves[z][1]]]
           
           // order moves with human intuition
-          // capture piece -> capture pawn -> ... -> move into pawn captured
+          // capture piece -> capture pawn -> ... -> (move into pawn captured)
           if (doesCapturePiece(board, moves[z])) {
             capturePiece.push(moveInformation)
           } 
           else if (doesCapturePawn(board, moves[z])) {
             capturePawn.push(moveInformation)
           } 
-          else if (doesWalkIntoPawn(board, moves[z])) {
-            walkIntoPawn.push(moveInformation)
-          }
           else {
             regularMoves.push(moveInformation)
           }
@@ -395,10 +400,10 @@ const minimax = (board, turn, depth, alpha, beta, maximizingPlayer) => {
       }
     }
   }
-  allMoves = capturePiece.concat(capturePawn).concat(regularMoves).concat(walkIntoPawn)
+  allMoves = capturePiece.concat(capturePawn).concat(regularMoves)
 
   if (depth === 0 || allMoves.length === 0) {
-    return evaluate(board)
+    return evaluate(board, moveNumber)
   }
 
 
@@ -412,13 +417,13 @@ const minimax = (board, turn, depth, alpha, beta, maximizingPlayer) => {
         }
       }
       let [pieceId, [fromRank, fromFile, toRank, toFile]] = allMoves[i]
-      // todo: account for special moves x3
+      // todo: account for special moves x2
       hypotheticalBoard[fromRank][fromFile] = 0
       hypotheticalBoard[toRank][toFile] = pieceId
 
       let originalValue = value
 
-      value = Math.max(value, minimax(hypotheticalBoard, turn * -1, depth - 1, alpha, beta, false))
+      value = Math.max(value, minimax(hypotheticalBoard, turn * -1, depth - 1, alpha, beta, false, moveNumber + 1))
 
       if (depth === ENGINE_DEPTH) {
         if (optimalEngineMove[0] === -1) {
@@ -446,13 +451,13 @@ const minimax = (board, turn, depth, alpha, beta, maximizingPlayer) => {
         }
       }
       let [pieceId, [fromRank, fromFile, toRank, toFile]] = allMoves[i]
-      // todo: account for special moves x3
+      // todo: account for special moves x2
       hypotheticalBoard[fromRank][fromFile] = 0
       hypotheticalBoard[toRank][toFile] = pieceId
 
       let originalValue = value
 
-      value = Math.min(value, minimax(hypotheticalBoard, turn * -1, depth - 1, alpha, beta, true))
+      value = Math.min(value, minimax(hypotheticalBoard, turn * -1, depth - 1, alpha, beta, true, moveNumber + 1))
 
       if (depth === ENGINE_DEPTH) {
         if (optimalEngineMove[0] === -1) {
@@ -487,14 +492,9 @@ const doesCapturePawn = (board, [toRank, toFile]) => {
   return false
 }
 
-const doesWalkIntoPawn = (board, [toRank, toFile]) => {
-  return false
-}
-
-
 
 // evaluate the score for the position for WHITE
-const evaluate = (board) => {
+const evaluate = (board, moveNumber) => {
   if (isCheckmate(board, 1)) {return -Infinity}
   if (isCheckmate(board, -1)) {return Infinity}
 
@@ -503,7 +503,11 @@ const evaluate = (board) => {
     for (let j=0; j < 8; j++) {
       if (board[i][j] > 0) {
         let piece = parsePieceId[board[i][j]]
-        score += piece.value * piece.color
+        // use move number here
+        score += piece.value * piece.color + 
+                  piece.openingBonus[piece.color === 1 ? 7 - i : i][j] / 15 
+                  * openingMoveThreshold / Math.max(openingMoveThreshold, moveNumber)
+                  * piece.color
       }
     }
   }
@@ -980,6 +984,8 @@ const resetBoardColors = () => {
 
 const ENGINE_DEPTH = 4
 let optimalEngineMove = [-1, [0, 0, 0, 0]]
+// considered to be in the opening before this move number
+const openingMoveThreshold = 15
 
 let wk, wq, wr1, wr2, wb1, wb2, wn1, wn2, wp1, wp2, wp3, wp4, wp5, wp6, wp7, wp8;
 let bk, bq, br1, br2, bb1, bb2, bn1, bn2, bp1, bp2, bp3, bp4, bp5, bp6, bp7, bp8;
