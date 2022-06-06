@@ -349,54 +349,14 @@ export default Competitive
 /////////////////////////////////////////////////////////////
 
 const generateEngineMove = (board, turn) => {
-  // todo: use minimax from the start ---> track the last inputted choice?/ at surface depth
-  
-  // todo: generalize this script
-  let allMoves = []
-  for (let i=0; i < 8; i++) {
-    for (let j=0; j < 8; j++) {
-      let pieceId = board[i][j]
-      if (pieceId > 0) {
-        let moves = possibleMoves(board, i, j, parsePieceId[pieceId], turn)
-        for (let z=0; z < moves.length; z++) {
-          allMoves.push([pieceId,[i, j, moves[z][0], moves[z][1]]])
-        }
-      }
-    }
-  }
-  // an element of allMoves = [pieceId, [fromRank, fromFile, toRank, toFile]] : all integers
 
-  let optimalMoveIndex = 0
-  let optimalMoveValue = -1 * turn * Infinity
-  for (let i=0; i < allMoves.length; i++) {
-    let hypotheticalBoard = [[],[],[],[],[],[],[],[]];
-    for (let i=0; i < 8; i++) {
-      for (let j = 0; j < 8; j++) {
-        hypotheticalBoard[i][j] = board[i][j]
-      }
-    }
-    let [pieceId, [fromRank, fromFile, toRank, toFile]] = allMoves[i]
-    // todo: account for special moves x3
-    hypotheticalBoard[fromRank][fromFile] = 0
-    hypotheticalBoard[toRank][toFile] = pieceId
+  optimalEngineMove = [-1, [0, 0, 0, 0]]
 
-    if (turn === 1) {
-      let minimaxResult = minimax(hypotheticalBoard, turn * -1, 3, -Infinity, Infinity, false)
-      if (minimaxResult > optimalMoveValue){
-        optimalMoveIndex = i
-        optimalMoveValue = minimaxResult
-      }
-    } else {
-      let minimaxResult = minimax(hypotheticalBoard, turn * -1, 3, -Infinity, Infinity, true)
-      if (minimaxResult < optimalMoveValue){
-        optimalMoveIndex = i
-        optimalMoveValue = minimaxResult
-      }
-    }
-  }
-  let enginePieceId = allMoves[optimalMoveIndex][0]
-  let move = allMoves[optimalMoveIndex][1].slice(2, 4)
-  
+  minimax(board, turn, ENGINE_DEPTH, -Infinity, Infinity, turn === 1 ? true: false)
+
+  let enginePieceId = optimalEngineMove[0]
+  let move = optimalEngineMove[1].slice(2, 4)
+
   return [enginePieceId, move]
 }
 
@@ -456,7 +416,19 @@ const minimax = (board, turn, depth, alpha, beta, maximizingPlayer) => {
       hypotheticalBoard[fromRank][fromFile] = 0
       hypotheticalBoard[toRank][toFile] = pieceId
 
+      let originalValue = value
+
       value = Math.max(value, minimax(hypotheticalBoard, turn * -1, depth - 1, alpha, beta, false))
+
+      if (depth === ENGINE_DEPTH) {
+        if (optimalEngineMove[0] === -1) {
+          optimalEngineMove = allMoves[i]
+        }
+        if (value !== originalValue) {
+          optimalEngineMove = allMoves[i]
+        }
+      }
+
       alpha = Math.max(alpha, value)
       if (value >= beta) {
         break
@@ -478,7 +450,19 @@ const minimax = (board, turn, depth, alpha, beta, maximizingPlayer) => {
       hypotheticalBoard[fromRank][fromFile] = 0
       hypotheticalBoard[toRank][toFile] = pieceId
 
+      let originalValue = value
+
       value = Math.min(value, minimax(hypotheticalBoard, turn * -1, depth - 1, alpha, beta, true))
+
+      if (depth === ENGINE_DEPTH) {
+        if (optimalEngineMove[0] === -1) {
+          optimalEngineMove = allMoves[i]
+        }
+        if (value !== originalValue) {
+          optimalEngineMove = allMoves[i]
+        }
+      }
+
       beta = Math.min(beta, value)
       if (value <= alpha) {
         break
@@ -993,6 +977,9 @@ const resetBoardColors = () => {
 /////////////////////////////////////////////////////////////
 // References ///////////////////////////////////////////////
 /////////////////////////////////////////////////////////////
+
+const ENGINE_DEPTH = 4
+let optimalEngineMove = [-1, [0, 0, 0, 0]]
 
 let wk, wq, wr1, wr2, wb1, wb2, wn1, wn2, wp1, wp2, wp3, wp4, wp5, wp6, wp7, wp8;
 let bk, bq, br1, br2, bb1, bb2, bn1, bn2, bp1, bp2, bp3, bp4, bp5, bp6, bp7, bp8;
