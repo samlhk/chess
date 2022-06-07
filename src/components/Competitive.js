@@ -281,9 +281,10 @@ const Competitive = () => {
   alpha beta pruning?
   move ordering (capturing)?
   opening preference
-
   search until no capturing possible
-  force king to side in end game
+  push pawns!
+
+  end game: force king to side to checkmate 
   transpositions to increase computational speed and depth
   
   */
@@ -403,8 +404,12 @@ const minimax = (board, turn, depth, alpha, beta, maximizingPlayer, moveNumber) 
   }
   allMoves = capturePiece.concat(capturePawn).concat(regularMoves)
 
-  if (depth === 0 || allMoves.length === 0) {
+  if (allMoves.length === 0) {
     return evaluate(board, moveNumber)
+  }
+
+  if (depth === 0) {
+    return minimaxCaptures(board, turn, alpha, beta, maximizingPlayer, moveNumber)
   }
 
 
@@ -463,6 +468,73 @@ const minimax = (board, turn, depth, alpha, beta, maximizingPlayer, moveNumber) 
 }
 
 
+const minimaxCaptures = (board, turn, alpha, beta, maximizingPlayer, moveNumber) => {
+  let captureMoves = []
+  for (let i=0; i < 8; i++) {
+    for (let j=0; j < 8; j++) {
+      let pieceId = board[i][j]
+      if (pieceId > 0) {
+        let moves = possibleMoves(board, i, j, parsePieceId[pieceId], turn)
+        for (let z=0; z < moves.length; z++) {
+          let moveInformation = [pieceId,[i, j, moves[z][0], moves[z][1]]]
+          
+          // only include capture moves
+          if (doesCapturePiece(board, moves[z]) || doesCapturePawn(board, moves[z])) {
+            captureMoves.push(moveInformation)
+          }
+        }
+      }
+    }
+  }
+
+  if (captureMoves.length === 0) {
+    return evaluate(board, moveNumber)
+  }
+
+  let value = maximizingPlayer ? -Infinity : Infinity
+
+  for (let i=0; i < captureMoves.length; i++) {
+    let hypotheticalBoard = [[],[],[],[],[],[],[],[]];
+    for (let i=0; i < 8; i++) {
+      for (let j = 0; j < 8; j++) {
+        hypotheticalBoard[i][j] = board[i][j]
+      }
+    }
+    let [pieceId, [fromRank, fromFile, toRank, toFile]] = captureMoves[i]
+
+    hypotheticalBoard[fromRank][fromFile] = 0
+    hypotheticalBoard[toRank][toFile] = pieceId
+
+    // set the pawn to be a queen if promoted, will affect this node's children
+    let originalPawn = parsePieceId[pieceId]
+    if (originalPawn instanceof Pawn && toRank === (turn === 1 ? 0 : 7)) {
+      parsePieceId[pieceId] = new Queen(turn, pieceId)
+    } 
+
+    value = maximizingPlayer ?
+     Math.max(value, minimaxCaptures(hypotheticalBoard, turn * -1, alpha, beta, false, moveNumber + 1)) :
+     Math.min(value, minimaxCaptures(hypotheticalBoard, turn * -1, alpha, beta, true, moveNumber + 1))
+
+    // revert the change and make the piece a pawn again
+    parsePieceId[pieceId] = originalPawn
+
+
+    if (maximizingPlayer) {
+      alpha = Math.max(alpha, value)
+      if (value >= beta) {
+        break
+      }
+    } else {
+      beta = Math.min(beta, value)
+      if (value <= alpha) {
+        break
+      }
+    }
+  }
+  return value
+}
+
+
 const doesCapturePiece = (board, [toRank, toFile]) => {
   if (board[toRank][toFile] > 0 && parsePieceId[board[toRank][toFile]].value >= 3) {
     return true
@@ -484,11 +556,14 @@ const evaluate = (board, moveNumber) => {
   if (isCheckmate(board, -1)) {return Infinity}
 
   let score = 0
+  let pieceCount = 0
+
   for (let i=0; i < 8; i++) {
     for (let j=0; j < 8; j++) {
       if (board[i][j] > 0) {
+        pieceCount++
         let piece = parsePieceId[board[i][j]]
-        // use move number here
+        // for opening bonus, only pieces on own side of the board are considered
         score += piece.value * piece.color + 
                   piece.openingBonus[piece.color === 1 ? 7 - i : i][j] / 15 
                   * openingMoveThreshold / Math.max(openingMoveThreshold, moveNumber)
@@ -496,6 +571,25 @@ const evaluate = (board, moveNumber) => {
       }
     }
   }
+
+  if (pieceCount <= endgamePieceThreshold) {
+    for (let i=0; i < 8; i++) {
+      for (let j=0; j < 8; j++) {
+        if (board[i][j] > 0) {
+          let piece = parsePieceId[board[i][j]]
+          // for endgame bonus, only pawns' values are directional
+          if (piece instanceof Pawn) {
+            score += piece.endgameBonus[piece.color === 1 ? i : 7 - i][j] / 10
+          } else {
+            score += piece.endgameBonus[i][j] / 10 
+                    * piece.color
+          }
+          
+        }
+      }
+    }
+  }
+
   return score
 }
 
@@ -971,6 +1065,7 @@ const ENGINE_DEPTH = 4
 let optimalEngineMove = [-1, [0, 0, 0, 0]]
 // considered to be in the opening before this move number
 const openingMoveThreshold = 15
+const endgamePieceThreshold = 20
 
 let wk, wq, wr1, wr2, wb1, wb2, wn1, wn2, wp1, wp2, wp3, wp4, wp5, wp6, wp7, wp8;
 let bk, bq, br1, br2, bb1, bb2, bn1, bn2, bp1, bp2, bp3, bp4, bp5, bp6, bp7, bp8;
