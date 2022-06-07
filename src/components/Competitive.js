@@ -435,9 +435,11 @@ const minimax = (board, turn, depth, alpha, beta, maximizingPlayer, moveNumber) 
 
     let originalValue = value
 
+    let rawBoardValue = minimax(hypotheticalBoard, turn * -1, depth - 1, alpha, beta, maximizingPlayer ? false : true, moveNumber + 1)
+
     value = maximizingPlayer ?
-     Math.max(value, minimax(hypotheticalBoard, turn * -1, depth - 1, alpha, beta, false, moveNumber + 1)) :
-     Math.min(value, minimax(hypotheticalBoard, turn * -1, depth - 1, alpha, beta, true, moveNumber + 1))
+     Math.max(value, rawBoardValue) :
+     Math.min(value, rawBoardValue)
 
     // revert the change and make the piece a pawn again
     parsePieceId[pieceId] = originalPawn
@@ -450,6 +452,9 @@ const minimax = (board, turn, depth, alpha, beta, maximizingPlayer, moveNumber) 
       if (value !== originalValue) {
         optimalEngineMove = allMoves[i]
       }
+      // if (rawBoardValue === (maximizingPlayer ? Infinity : -Infinity)) {
+      //   movesToMate.push(allMoves[i])
+      // }
     }
 
     if (maximizingPlayer) {
@@ -557,12 +562,24 @@ const evaluate = (board, moveNumber) => {
 
   let score = 0
   let pieceCount = 0
+  let whitePieceCount = 0
+  let blackPieceCount = 0
+  let whiteKingPosition = [0, 0]
+  let blackKingPosition = [0, 0]
 
+  // piece value, opening bonus and count number of pieces
   for (let i=0; i < 8; i++) {
     for (let j=0; j < 8; j++) {
       if (board[i][j] > 0) {
-        pieceCount++
         let piece = parsePieceId[board[i][j]]
+
+        // counting operations
+        pieceCount++
+        if (piece.color === 1) {whitePieceCount++}
+        else {blackPieceCount++}
+        if (board[i][j] === 1) {whiteKingPosition = [i, j]}
+        if (board[i][j] === 17) {blackKingPosition = [i, j]}
+        
         // for opening bonus, only pieces on own side of the board are considered
         score += piece.value * piece.color + 
                   piece.openingBonus[piece.color === 1 ? 7 - i : i][j] / 15 
@@ -571,7 +588,29 @@ const evaluate = (board, moveNumber) => {
       }
     }
   }
+  
+  // checkmate phase: bypasses endgame bonus
+  if (whitePieceCount === 1) {
+    // white king is better off in the centre
+    score += parsePieceId[1].endgameBonus[whiteKingPosition[0]][whiteKingPosition[1]] / 10
+    // black king is better off being close to the white king
+    score += Math.sqrt((whiteKingPosition[0] - blackKingPosition[0]) ** 2 + 
+                (whiteKingPosition[1] - blackKingPosition[1]) ** 2) / 2
 
+    return score
+  }
+
+  if (blackPieceCount === 1) {
+    // black king is better off in the centre
+    score -= parsePieceId[17].endgameBonus[blackKingPosition[0]][blackKingPosition[1]] / 10
+    // white king is better off being close to the black king
+    score -= Math.sqrt((whiteKingPosition[0] - blackKingPosition[0]) ** 2 + 
+                (whiteKingPosition[1] - blackKingPosition[1]) ** 2) / 2
+
+    return score
+  }
+
+  // endgame bonus
   if (pieceCount <= endgamePieceThreshold) {
     for (let i=0; i < 8; i++) {
       for (let j=0; j < 8; j++) {
@@ -1139,6 +1178,17 @@ const startingPosition = [
   [0, 0, 0, 0, 0, 0, 0, 0],
   [9, 10, 11, 12, 13, 14, 15, 16],
   [3, 7, 5, 2, 1, 6, 8, 4]
+]
+
+const startingsPosition = [
+  [0, 0, 0, 18, 17, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 1, 0, 0, 0]
 ]
 
 const endGameMessages = [
