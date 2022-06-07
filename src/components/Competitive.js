@@ -28,7 +28,7 @@ const Competitive = () => {
     if (status === ENGINE_TURN) {
       engineMove(turn)
       updateStatus(PLAYER_TURN)
-      // todo: this overwirtes a checkmate
+      // todo: this overwirtes a checkmate by the engine
     }
   })
 
@@ -90,7 +90,6 @@ const Competitive = () => {
     }
 
     // check if the move is legal
-    // todo: player can only move when their turn, might not be a problem if engine moves quick
     if ((status === PLAYER_TURN || status === ENGINE_TURN) && checkMovePossible(currentBoardInfo)) {
         // switch to engine's turn
         if (status !== ENGINE_TURN) {
@@ -206,8 +205,12 @@ const Competitive = () => {
     let piece = parsePieceId[pieceId]
     if (piece instanceof Pawn) {
       if (toRank === (piece.color === 1 ? 0 : 7)) {
-        updateStatus(SELECTING)
-        updatePromotedPieceInfo([pieceId, piece.color])
+        if (status === ENGINE_TURN) {
+          parsePieceId[pieceId] = new Queen(piece.color, pieceId)
+        } else {
+          updateStatus(SELECTING)
+          updatePromotedPieceInfo([pieceId, piece.color])
+        }
       }
     }
   }
@@ -232,8 +235,7 @@ const Competitive = () => {
       default:
         break
     }
-    // todo: deal with engine promoting 
-     updateStatus(ENGINE_TURN)
+    updateStatus(ENGINE_TURN)
 
     checkCheckmate(board, turn)
   }
@@ -369,7 +371,6 @@ const generateEngineMove = (board, turn, moveNumber) => {
   return [enginePieceId, move]
 }
 
-// todo: investigate this function
 // gives optimal value for this board position this turn
 const minimax = (board, turn, depth, alpha, beta, maximizingPlayer, moveNumber) => {
   
@@ -407,74 +408,58 @@ const minimax = (board, turn, depth, alpha, beta, maximizingPlayer, moveNumber) 
   }
 
 
-  if (maximizingPlayer) {
-    let value = -Infinity
-    for (let i=0; i < allMoves.length; i++) {
-      let hypotheticalBoard = [[],[],[],[],[],[],[],[]];
-      for (let i=0; i < 8; i++) {
-        for (let j = 0; j < 8; j++) {
-          hypotheticalBoard[i][j] = board[i][j]
-        }
+  let value = maximizingPlayer ? -Infinity : Infinity
+
+  for (let i=0; i < allMoves.length; i++) {
+    let hypotheticalBoard = [[],[],[],[],[],[],[],[]];
+    for (let i=0; i < 8; i++) {
+      for (let j = 0; j < 8; j++) {
+        hypotheticalBoard[i][j] = board[i][j]
       }
-      let [pieceId, [fromRank, fromFile, toRank, toFile]] = allMoves[i]
-      // todo: account for special moves x2
-      hypotheticalBoard[fromRank][fromFile] = 0
-      hypotheticalBoard[toRank][toFile] = pieceId
+    }
+    let [pieceId, [fromRank, fromFile, toRank, toFile]] = allMoves[i]
 
-      let originalValue = value
+    hypotheticalBoard[fromRank][fromFile] = 0
+    hypotheticalBoard[toRank][toFile] = pieceId
 
-      value = Math.max(value, minimax(hypotheticalBoard, turn * -1, depth - 1, alpha, beta, false, moveNumber + 1))
+    // set the pawn to be a queen if promoted, will affect this node's children
+    let originalPawn = parsePieceId[pieceId]
+    if (originalPawn instanceof Pawn && toRank === (turn === 1 ? 0 : 7)) {
+      parsePieceId[pieceId] = new Queen(turn, pieceId)
+    } 
 
-      if (depth === ENGINE_DEPTH) {
-        if (optimalEngineMove[0] === -1) {
-          optimalEngineMove = allMoves[i]
-        }
-        if (value !== originalValue) {
-          optimalEngineMove = allMoves[i]
-        }
+    let originalValue = value
+
+    value = maximizingPlayer ?
+     Math.max(value, minimax(hypotheticalBoard, turn * -1, depth - 1, alpha, beta, false, moveNumber + 1)) :
+     Math.min(value, minimax(hypotheticalBoard, turn * -1, depth - 1, alpha, beta, true, moveNumber + 1))
+
+    // revert the change and make the piece a pawn again
+    parsePieceId[pieceId] = originalPawn
+
+    // at the current decision node, update the most optimal (maximum or minimum) move
+    if (depth === ENGINE_DEPTH) {
+      if (optimalEngineMove[0] === -1) {
+        optimalEngineMove = allMoves[i]
       }
+      if (value !== originalValue) {
+        optimalEngineMove = allMoves[i]
+      }
+    }
 
+    if (maximizingPlayer) {
       alpha = Math.max(alpha, value)
       if (value >= beta) {
         break
       }
-    }
-    return value
-  }
-  else {
-    let value = Infinity
-    for (let i=0; i < allMoves.length; i++) {
-      let hypotheticalBoard = [[],[],[],[],[],[],[],[]];
-      for (let i=0; i < 8; i++) {
-        for (let j = 0; j < 8; j++) {
-          hypotheticalBoard[i][j] = board[i][j]
-        }
-      }
-      let [pieceId, [fromRank, fromFile, toRank, toFile]] = allMoves[i]
-      // todo: account for special moves x2
-      hypotheticalBoard[fromRank][fromFile] = 0
-      hypotheticalBoard[toRank][toFile] = pieceId
-
-      let originalValue = value
-
-      value = Math.min(value, minimax(hypotheticalBoard, turn * -1, depth - 1, alpha, beta, true, moveNumber + 1))
-
-      if (depth === ENGINE_DEPTH) {
-        if (optimalEngineMove[0] === -1) {
-          optimalEngineMove = allMoves[i]
-        }
-        if (value !== originalValue) {
-          optimalEngineMove = allMoves[i]
-        }
-      }
-
+    } else {
       beta = Math.min(beta, value)
       if (value <= alpha) {
         break
       }
     }
-    return value
   }
+  return value
 }
 
 
