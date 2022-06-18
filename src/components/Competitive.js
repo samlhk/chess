@@ -26,9 +26,11 @@ const Competitive = () => {
 
   useEffect(() => {
     if (status === ENGINE_TURN) {
+      ongoingEngine = true
       engineMove(turn)
-      updateStatus(PLAYER_TURN)
-      // todo: this overwirtes a checkmate by the engine
+      if (ongoingEngine) {
+        updateStatus(PLAYER_TURN)
+      }
     }
   })
 
@@ -137,9 +139,11 @@ const Competitive = () => {
     if (allMoves.length === 0) {
       if (inCheck({'board': board, 'color': turn})) {
         updateStatus(turn === 1 ? BLACK_CHECKMATE : WHITE_CHECKMATE)
+        ongoingEngine = false
       }
       else {
         updateStatus(STALEMATE)
+        ongoingEngine = false
       }
       
     }
@@ -179,17 +183,20 @@ const Competitive = () => {
     // King v King
     if (whiteMinorCount === 0 && blackMinorCount === 0) {
       updateStatus(INSUFFICIENT)
+      ongoingEngine = false
       return
     }
     // King + minor v King
     if ((whiteMinorCount === 0 && blackMinorCount === 1) || (whiteMinorCount === 1 && blackMinorCount === 0)){
       updateStatus(INSUFFICIENT)
+      ongoingEngine = false
       return
     }
     // King + Bishop v King + Bishop (same color)
     if (whiteBishopCount === 1 && blackBishopCount === 1) {
       if (whiteBishop.bishopColor === blackBishop.bishopColor) {
         updateStatus(INSUFFICIENT)
+        ongoingEngine = false
         return
       }
     }
@@ -274,20 +281,6 @@ const Competitive = () => {
 
     drop(move[0].toString().concat(move[1].toString()), false, enginePieceId)
   }
-  /*
-  todo:
-  evaluate position
-  minimax
-  alpha beta pruning?
-  move ordering (capturing)?
-  opening preference
-  search until no capturing possible
-  push pawns!
-
-  end game: force king to side to checkmate 
-  transpositions to increase computational speed and depth
-  
-  */
 
   return (
     <>
@@ -364,7 +357,25 @@ const generateEngineMove = (board, turn, moveNumber) => {
 
   optimalEngineMove = [-1, [0, 0, 0, 0]]
 
-  console.log(minimax(board, turn, ENGINE_DEPTH, -Infinity, Infinity, turn === 1 ? true: false, moveNumber))
+  const minimaxResult = minimax(board, turn, ENGINE_DEPTH, -Infinity, Infinity, turn === 1 ? true: false, moveNumber)
+  console.log('current evaluation', minimaxResult)
+
+  let whitePieceCount = 0
+  let blackPieceCount = 0
+  for (let i=0; i < 8; i++) {
+    for (let j=0; j < 8; j++) {
+      if (board[i][j] > 0) {
+        let piece = parsePieceId[board[i][j]]
+        if (piece.color === 1) {whitePieceCount++}
+        else {blackPieceCount++}
+      }
+    }
+  }
+  // enter endgame checkmate mode
+  if (minimaxResult === (turn === 1 ? Infinity : -Infinity) && 
+    (whitePieceCount < endgameCheckmatePieceThreshold || blackPieceCount < endgameCheckmatePieceThreshold)) {
+    optimalEngineMove = checkMovesForFastestMate(board, turn)
+  }
 
   let enginePieceId = optimalEngineMove[0]
   let move = optimalEngineMove[1].slice(2, 4)
@@ -452,9 +463,6 @@ const minimax = (board, turn, depth, alpha, beta, maximizingPlayer, moveNumber) 
       if (value !== originalValue) {
         optimalEngineMove = allMoves[i]
       }
-      // if (rawBoardValue === (maximizingPlayer ? Infinity : -Infinity)) {
-      //   movesToMate.push(allMoves[i])
-      // }
     }
 
     if (maximizingPlayer) {
@@ -537,6 +545,134 @@ const minimaxCaptures = (board, turn, alpha, beta, maximizingPlayer, moveNumber)
     }
   }
   return value
+}
+
+const checkMovesForFastestMate = (board, turn) => {
+  let allMoves = []
+  for (let i=0; i < 8; i++) {
+    for (let j=0; j < 8; j++) {
+      let pieceId = board[i][j]
+      if (pieceId > 0) {
+        let moves = possibleMoves(board, i, j, parsePieceId[pieceId], turn)
+        for (let z=0; z < moves.length; z++) {
+          let moveInformation = [pieceId,[i, j, moves[z][0], moves[z][1]]]
+          
+          allMoves.push(moveInformation)
+        }
+      }
+    }
+  }
+
+  let fastestMateIn = Infinity
+  let fastestMate = [-1, [0, 0, 0, 0]]
+
+  for (let i=0; i < allMoves.length; i++) {
+    let hypotheticalBoard = [[],[],[],[],[],[],[],[]];
+    for (let i=0; i < 8; i++) {
+      for (let j = 0; j < 8; j++) {
+        hypotheticalBoard[i][j] = board[i][j]
+      }
+    }
+    let [pieceId, [fromRank, fromFile, toRank, toFile]] = allMoves[i]
+
+    hypotheticalBoard[fromRank][fromFile] = 0
+    hypotheticalBoard[toRank][toFile] = pieceId
+
+    // set the pawn to be a queen if promoted, will affect this node's children
+    let originalPawn = parsePieceId[pieceId]
+    if (originalPawn instanceof Pawn && toRank === (turn === 1 ? 0 : 7)) {
+      parsePieceId[pieceId] = new Queen(turn, pieceId)
+    } 
+
+    let mateIn = findFastestMate(hypotheticalBoard, turn * -1, ENGINE_DEPTH, -Infinity, Infinity, turn === -1, turn === 1 ? Infinity : -Infinity)[1]
+    if (mateIn < fastestMateIn) {
+      fastestMate = allMoves[i]
+      fastestMateIn = mateIn
+    }
+    if (mateIn === 1) {
+      return allMoves[i]
+    }
+
+    // revert the change and make the piece a pawn again
+    parsePieceId[pieceId] = originalPawn
+    
+  }
+  return fastestMate
+}
+
+// output = [value of position, <mate in>]
+const findFastestMate = (board, turn, depth, alpha, beta, maximizingPlayer, matingValue) => {
+  
+  let allMoves = []
+  for (let i=0; i < 8; i++) {
+    for (let j=0; j < 8; j++) {
+      let pieceId = board[i][j]
+      if (pieceId > 0) {
+        let moves = possibleMoves(board, i, j, parsePieceId[pieceId], turn)
+        for (let z=0; z < moves.length; z++) {
+          let moveInformation = [pieceId,[i, j, moves[z][0], moves[z][1]]]
+          
+          allMoves.push(moveInformation)
+        }
+      }
+    }
+  }
+
+  if (evaluate(board, 0) === matingValue) {
+    return [matingValue, 1]
+  }
+
+  if (allMoves.length === 0 || depth === 0) {
+    // indicated by infinity, this path does not lead to mate and should be ignored
+    return [evaluate(board, 0), Infinity]
+  }
+
+
+  let value = maximizingPlayer ? -Infinity : Infinity
+  let mateIn = Infinity
+
+  for (let i=0; i < allMoves.length; i++) {
+    let hypotheticalBoard = [[],[],[],[],[],[],[],[]];
+    for (let i=0; i < 8; i++) {
+      for (let j = 0; j < 8; j++) {
+        hypotheticalBoard[i][j] = board[i][j]
+      }
+    }
+    let [pieceId, [fromRank, fromFile, toRank, toFile]] = allMoves[i]
+
+    hypotheticalBoard[fromRank][fromFile] = 0
+    hypotheticalBoard[toRank][toFile] = pieceId
+
+    // set the pawn to be a queen if promoted, will affect this node's children
+    let originalPawn = parsePieceId[pieceId]
+    if (originalPawn instanceof Pawn && toRank === (turn === 1 ? 0 : 7)) {
+      parsePieceId[pieceId] = new Queen(turn, pieceId)
+    } 
+
+    let searchOutput = findFastestMate(hypotheticalBoard, turn * -1, depth - 1, alpha, beta, !maximizingPlayer, matingValue)
+
+    value = maximizingPlayer ?
+     Math.max(value, searchOutput[0]) :
+     Math.min(value, searchOutput[0])
+
+    mateIn = Math.min(mateIn, searchOutput[1] + 1)
+
+    // revert the change and make the piece a pawn again
+    parsePieceId[pieceId] = originalPawn
+
+    if (maximizingPlayer) {
+      alpha = Math.max(alpha, value)
+      if (value > beta) {
+        break
+      }
+    } else {
+      beta = Math.min(beta, value)
+      if (value < alpha) {
+        break
+      }
+    }
+  }
+  return [value, mateIn]
 }
 
 
@@ -1102,9 +1238,12 @@ const resetBoardColors = () => {
 
 const ENGINE_DEPTH = 4
 let optimalEngineMove = [-1, [0, 0, 0, 0]]
+// false if checkmate or draw is detected
+let ongoingEngine = true
 // considered to be in the opening before this move number
 const openingMoveThreshold = 15
 const endgamePieceThreshold = 20
+const endgameCheckmatePieceThreshold = 5
 
 let wk, wq, wr1, wr2, wb1, wb2, wn1, wn2, wp1, wp2, wp3, wp4, wp5, wp6, wp7, wp8;
 let bk, bq, br1, br2, bb1, bb2, bn1, bn2, bp1, bp2, bp3, bp4, bp5, bp6, bp7, bp8;
@@ -1166,8 +1305,8 @@ for (let i = 0; i < 8; i++) {
 
 //const fileLegend = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
 //const rankLegend = ['8', '7', '6', '5', '4', '3', '2', '1']
-const fileLegend = [7, 6, 5, 4, 3, 2, 1, 0]
-const rankLegend = [7, 6, 5, 4, 3, 2, 1, 0]
+const fileLegend = [7, 6, 5, 4, 3, 2, 1, 0].reverse()
+const rankLegend = [7, 6, 5, 4, 3, 2, 1, 0].reverse()
 
 const startingPosition = [
   [19, 23, 21, 18, 17, 22, 24, 20],
@@ -1178,17 +1317,6 @@ const startingPosition = [
   [0, 0, 0, 0, 0, 0, 0, 0],
   [9, 10, 11, 12, 13, 14, 15, 16],
   [3, 7, 5, 2, 1, 6, 8, 4]
-]
-
-const startingsPosition = [
-  [0, 0, 0, 18, 17, 0, 0, 0],
-  [0, 0, 0, 0, 0, 0, 0, 0],
-  [0, 0, 0, 0, 0, 0, 0, 0],
-  [0, 0, 0, 0, 0, 0, 0, 0],
-  [0, 0, 0, 0, 0, 0, 0, 0],
-  [0, 0, 0, 0, 0, 0, 0, 0],
-  [0, 0, 0, 0, 0, 0, 0, 0],
-  [0, 0, 0, 0, 1, 0, 0, 0]
 ]
 
 const endGameMessages = [
