@@ -13,7 +13,7 @@ function App() {
 
         <Route path='/play' component={Play}/>
 
-        {<Route path='/competitive' component={Competitive}/>}
+        <Route path='/competitive' component={Competitive}/>
 
       </div>
     </Router>

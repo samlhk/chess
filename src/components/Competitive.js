@@ -286,7 +286,7 @@ const Competitive = () => {
     <>
       {status === CHOOSING ? <ChoosingMenu onChoose={chooseSide}/> :
 
-      <div id='play-wrapper'>
+      <div id='game-wrapper'>
         <div id='play-area'>
           <div id='side-legend'>
             {rankLegend.map((rank) => <div key={rank}>{rank}</div>)}
@@ -326,6 +326,8 @@ const Competitive = () => {
                 switch(status) {
                   case PLAYER_TURN:
                     return (<Panel turn={turn} onResign={onResign}/>)
+                  case ENGINE_TURN:
+                    return (<Panel turn={turn} engineCalculating={true} />)
                   case SELECTING:
                     return (<Selection turn={turn * -1} onResolve={resolvePromotion} />)
                   default:
@@ -337,9 +339,9 @@ const Competitive = () => {
                             </div>)
                 }
             })()}
-            <button className='board-control-btn' onClick={flipBoard}>
+            {status !== ENGINE_TURN && <button className='board-control-btn' onClick={flipBoard}>
               <i className='fa fa-exchange fa-3x fa-rotate-90'/>
-            </button>
+            </button>}
           </div>
         </div>
       </div>}

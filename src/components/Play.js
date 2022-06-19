@@ -243,7 +243,7 @@ const Play = () => {
   }
 
   return (
-    <div id='play-wrapper'>
+    <div id='game-wrapper'>
       <div id='play-area'>
         <div id='side-legend'>
           {rankLegend.map((rank) => <div key={rank}>{rank}</div>)}
