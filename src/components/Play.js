@@ -338,8 +338,20 @@ const possibleMoves = (board, rank, file, piece, turn) => {
         hypotheticalBoard[i][j] = board[i][j]
       }
     }
+    let toRank = parseInt(moves[i][0])
+    let toFile = parseInt(moves[i][1])
+
     hypotheticalBoard[rank][file] = 0
-    hypotheticalBoard[parseInt(moves[i][0])][parseInt(moves[i][1])] = parseInt(piece.id)
+    hypotheticalBoard[toRank][toFile] = parseInt(piece.id)
+
+    // take the en passant pawn
+    if (piece instanceof Pawn) {
+      if (rank - piece.color === toRank
+         && (file - 1 === toFile || file + 1 === toFile)
+         && board[toRank][toFile] === 0) {
+        hypotheticalBoard[rank][toFile] = 0
+      }
+    }
 
     if (!inCheck({'board': hypotheticalBoard, 'color': turn})) {
       possibleMoves.push(moves[i])

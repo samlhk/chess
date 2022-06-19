@@ -802,9 +802,20 @@ const possibleMoves = (board, rank, file, piece, turn) => {
         hypotheticalBoard[i][j] = board[i][j]
       }
     }
+    let toRank = parseInt(moves[i][0])
+    let toFile = parseInt(moves[i][1])
+
     hypotheticalBoard[rank][file] = 0
-    hypotheticalBoard[parseInt(moves[i][0])][parseInt(moves[i][1])] = parseInt(piece.id)
-    // todo: account for en passant discovered check in both scripts
+    hypotheticalBoard[toRank][toFile] = parseInt(piece.id)
+
+    // take the en passant pawn
+    if (piece instanceof Pawn) {
+      if (rank - piece.color === toRank
+         && (file - 1 === toFile || file + 1 === toFile)
+         && board[toRank][toFile] === 0) {
+        hypotheticalBoard[rank][toFile] = 0
+      }
+    }
 
     if (!inCheck({'board': hypotheticalBoard, 'color': turn})) {
       possibleMoves.push(moves[i])
@@ -1136,13 +1147,7 @@ const isCheckmate= (board, turn) => {
       }
     }
   if (allMoves.length === 0) {
-    if (inCheck({'board': board, 'color': turn})) {
-      return true
-    }
-    else {
-      // todo: handle stalemate here later
-      return false
-    }
+    return true
   }
   return false
 }
@@ -1303,10 +1308,8 @@ for (let i = 0; i < 8; i++) {
   }
 }
 
-//const fileLegend = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
-//const rankLegend = ['8', '7', '6', '5', '4', '3', '2', '1']
-const fileLegend = [7, 6, 5, 4, 3, 2, 1, 0].reverse()
-const rankLegend = [7, 6, 5, 4, 3, 2, 1, 0].reverse()
+const fileLegend = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+const rankLegend = ['8', '7', '6', '5', '4', '3', '2', '1']
 
 const startingPosition = [
   [19, 23, 21, 18, 17, 22, 24, 20],
