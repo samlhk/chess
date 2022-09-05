@@ -3,9 +3,9 @@ import Piece from './Piece'
 export default class Pawn extends Piece{
 
     constructor(color, id) {
-        super(color, id)
-        this.canTakeByEnPassant = false
-        this.value = 1
+        super(color, id);
+        this.canTakeByEnPassant = false;
+        this.value = 1;
         this.openingBonus = [
             [0, 0, 0, 0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0, 0, 0, 0],
@@ -15,7 +15,7 @@ export default class Pawn extends Piece{
             [0, 0, 0, 0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0, 0, 0, 0],
-        ]
+        ];
         // perspective: white's board
         this.endgameBonus = [
             [0, 0, 0, 0, 0, 0, 0, 0],
@@ -26,11 +26,11 @@ export default class Pawn extends Piece{
             [1, 1, 1, 1, 1, 1, 1, 1],
             [0, 0, 0, 0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0, 0, 0, 0],
-        ]
+        ];
     }
 
     render() {
-        if (this.color === 1) {return require('./img/wp.png')}
-        if (this.color === -1) {return require('./img/bp.png')}
+        if (this.color === 1) { return require('./img/wp.png'); }
+        if (this.color === -1) { return require('./img/bp.png'); }
     }
 }

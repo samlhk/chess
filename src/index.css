@@ -83,7 +83,7 @@ footer {
   background-color: #2B414D;
 }
 
-img {
+img, .piece-block {
   width: var(--cell-dimension);
   height: var(--cell-dimension);
 }
@@ -99,7 +99,10 @@ img {
 }
 
 #panel {
+  padding-top: 20px;
   padding-left: 20px;
+  width: 100%;
+  text-align: center;
 }
 
 #turn-indicator {
@@ -137,4 +140,5 @@ img {
 .board-control-btn {
   background-color: var(--background-color);
   border: none;
+  margin: 2rem 0;
 }

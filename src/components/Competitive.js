@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import King from './piece/King'
 import Queen from './piece/Queen'
 import Bishop from './piece/Bishop'
@@ -8,6 +9,10 @@ import Pawn from './piece/Pawn'
 import Panel from './Panel'
 import Selection from './Selection'
 import ChoosingMenu from './ChoosingMenu'
+import { checkMovePossible, possibleMoves, handleCastling, handleEnPassant, inCheck,
+  resetBoardColors, parsePieceId, setStartingPieces,
+  boardTemplate, createBoardTemplate,fileLegend, rankLegend, startingPosition, endGameMessages
+   } from './util'
 
 const Competitive = () => {
   const [board, updateBoard] = useState(startingPosition)
@@ -15,7 +20,7 @@ const Competitive = () => {
   // white: 1    black: -1
   const [turn, updateTurn] = useState(1)
 
-  const [status, updateStatus] = useState(CHOOSING)
+  const [status, updateStatus] = useState(gameState.CHOOSING)
 
   // [piece id, piece color]
   const [promotedPieceInfo, updatePromotedPieceInfo] = useState([0, 0])
@@ -25,13 +30,14 @@ const Competitive = () => {
   const [moveNumber, updateMoveNumber] = useState(1)
 
   useEffect(() => {
-    if (status === ENGINE_TURN) {
+    if (status === gameState.ENGINE_TURN) {
       ongoingEngine = true
       engineMove(turn)
+      // check if game is terminated after engine moves
       if (ongoingEngine) {
-        updateStatus(PLAYER_TURN)
+        updateStatus(gameState.PLAYER_TURN)
       }
-    }
+    }    
   })
 
 
@@ -92,10 +98,10 @@ const Competitive = () => {
     }
 
     // check if the move is legal
-    if ((status === PLAYER_TURN || status === ENGINE_TURN) && checkMovePossible(currentBoardInfo)) {
+    if ((status === gameState.PLAYER_TURN || status === gameState.ENGINE_TURN) && checkMovePossible(currentBoardInfo)) {
         // switch to engine's turn
-        if (status !== ENGINE_TURN) {
-          updateStatus(ENGINE_TURN)
+        if (status !== gameState.ENGINE_TURN) {
+          updateStatus(gameState.ENGINE_TURN)
         }
 
         if (turn === -1) {
@@ -138,11 +144,11 @@ const Competitive = () => {
       }
     if (allMoves.length === 0) {
       if (inCheck({'board': board, 'color': turn})) {
-        updateStatus(turn === 1 ? BLACK_CHECKMATE : WHITE_CHECKMATE)
+        updateStatus(turn === 1 ? gameState.BLACK_CHECKMATE : gameState.WHITE_CHECKMATE)
         ongoingEngine = false
       }
       else {
-        updateStatus(STALEMATE)
+        updateStatus(gameState.STALEMATE)
         ongoingEngine = false
       }
       
@@ -182,20 +188,20 @@ const Competitive = () => {
 
     // King v King
     if (whiteMinorCount === 0 && blackMinorCount === 0) {
-      updateStatus(INSUFFICIENT)
+      updateStatus(gameState.INSUFFICIENT)
       ongoingEngine = false
       return
     }
     // King + minor v King
     if ((whiteMinorCount === 0 && blackMinorCount === 1) || (whiteMinorCount === 1 && blackMinorCount === 0)){
-      updateStatus(INSUFFICIENT)
+      updateStatus(gameState.INSUFFICIENT)
       ongoingEngine = false
       return
     }
     // King + Bishop v King + Bishop (same color)
     if (whiteBishopCount === 1 && blackBishopCount === 1) {
       if (whiteBishop.bishopColor === blackBishop.bishopColor) {
-        updateStatus(INSUFFICIENT)
+        updateStatus(gameState.INSUFFICIENT)
         ongoingEngine = false
         return
       }
@@ -204,7 +210,7 @@ const Competitive = () => {
   }
 
   const onResign = () => {
-    updateStatus(turn === 1 ? WHITE_RESIGN : BLACK_RESIGN)
+    updateStatus(turn === 1 ? gameState.WHITE_RESIGN : gameState.BLACK_RESIGN)
   }
 
   // prompt the player to choose the promoted piece if needed
@@ -212,10 +218,10 @@ const Competitive = () => {
     let piece = parsePieceId[pieceId]
     if (piece instanceof Pawn) {
       if (toRank === (piece.color === 1 ? 0 : 7)) {
-        if (status === ENGINE_TURN) {
+        if (status === gameState.ENGINE_TURN) {
           parsePieceId[pieceId] = new Queen(piece.color, pieceId)
         } else {
-          updateStatus(SELECTING)
+          updateStatus(gameState.SELECTING)
           updatePromotedPieceInfo([pieceId, piece.color])
         }
       }
@@ -242,7 +248,7 @@ const Competitive = () => {
       default:
         break
     }
-    updateStatus(ENGINE_TURN)
+    updateStatus(gameState.ENGINE_TURN)
 
     checkCheckmate(board, turn)
   }
@@ -252,7 +258,7 @@ const Competitive = () => {
     setStartingPieces()
     updateBoard(startingPosition)
     updateTurn(1)
-    updateStatus(CHOOSING)
+    updateStatus(gameState.CHOOSING)
     updateMoveNumber(1)
     updatePromotedPieceInfo([0, 0])
   }
@@ -269,13 +275,13 @@ const Competitive = () => {
 
     // set the first moving side
     if (color === 1) {
-      updateStatus(PLAYER_TURN)
+      updateStatus(gameState.PLAYER_TURN)
     } else {
-      updateStatus(ENGINE_TURN)
+      updateStatus(gameState.ENGINE_TURN)
     }
   }
 
-  const engineMove = (turn) => {
+  const engineMove = async (turn) => {
 
     let [enginePieceId, move] = generateEngineMove(board, turn, moveNumber)
 
@@ -284,7 +290,7 @@ const Competitive = () => {
 
   return (
     <>
-      {status === CHOOSING ? <ChoosingMenu onChoose={chooseSide}/> :
+      {status === gameState.CHOOSING ? <ChoosingMenu onChoose={chooseSide}/> :
 
       <div id='game-wrapper'>
         <div id='play-area'>
@@ -321,14 +327,17 @@ const Competitive = () => {
 
         <div id='panel'>
           <div>
+            <Link to='/'>
+              <button className='btn btn-block btn-secondary'>Home</button>
+            </Link><br/>
             <h1>Move: {moveNumber}</h1>
             {(() => {
                 switch(status) {
-                  case PLAYER_TURN:
+                  case gameState.PLAYER_TURN:
                     return (<Panel turn={turn} onResign={onResign}/>)
-                  case ENGINE_TURN:
+                  case gameState.ENGINE_TURN:
                     return (<Panel turn={turn} engineCalculating={true} />)
-                  case SELECTING:
+                  case gameState.SELECTING:
                     return (<Selection turn={turn * -1} onResolve={resolvePromotion} />)
                   default:
                     return (<div id='end-game'>
@@ -339,7 +348,7 @@ const Competitive = () => {
                             </div>)
                 }
             })()}
-            {status !== ENGINE_TURN && <button className='board-control-btn' onClick={flipBoard}>
+            {status !== gameState.ENGINE_TURN && <button className='board-control-btn' onClick={flipBoard}>
               <i className='fa fa-exchange fa-3x fa-rotate-90'/>
             </button>}
           </div>
@@ -770,368 +779,6 @@ const evaluate = (board, moveNumber) => {
   return score
 }
 
-
-/////////////////////////////////////////////////////////////
-// Logic ////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////
-
-const checkMovePossible = ({ board, fromRank, fromFile, toRank, toFile, piece, turn }) => {
-
-  let moves = possibleMoves(board, fromRank, fromFile, piece, turn)
-
-  for (let i = 0; i < moves.length; i++) {
-    if (moves[i][0] === toRank && moves[i][1] === toFile) {
-      return true
-    }
-  }
-  return false
-}
-
-const possibleMoves = (board, rank, file, piece, turn) => {
-
-  let possibleMoves = []
-
-  // only show available moves for current player
-  if (piece.color !== turn) {return possibleMoves}
-
-  let moves = sensibleMoves(board, rank, file, piece)
-
-  for (let i=0; i < moves.length; i++) {
-
-    let hypotheticalBoard = [[],[],[],[],[],[],[],[]];
-    for (let i=0; i < 8; i++) {
-      for (let j = 0; j < 8; j++) {
-        hypotheticalBoard[i][j] = board[i][j]
-      }
-    }
-    let toRank = parseInt(moves[i][0])
-    let toFile = parseInt(moves[i][1])
-
-    hypotheticalBoard[rank][file] = 0
-    hypotheticalBoard[toRank][toFile] = parseInt(piece.id)
-
-    // take the en passant pawn
-    if (piece instanceof Pawn) {
-      if (rank - piece.color === toRank
-         && (file - 1 === toFile || file + 1 === toFile)
-         && board[toRank][toFile] === 0) {
-        hypotheticalBoard[rank][toFile] = 0
-      }
-    }
-
-    if (!inCheck({'board': hypotheticalBoard, 'color': turn})) {
-      possibleMoves.push(moves[i])
-    }
-  }
-  return possibleMoves
-}
-
-
-// does not consider checks
-const checkMoveSensible = ({ board, fromRank, fromFile, toRank, toFile, piece, ignoreCastling }) => {
-  
-  let moves = sensibleMoves(board, fromRank, fromFile, piece, ignoreCastling)
-
-  for (let i = 0; i < moves.length; i++) {
-    if (moves[i][0] === toRank && moves[i][1] === toFile) {
-      return true
-    }
-  }
-  return false
-}
-
-
-const sensibleMoves = (board, fromRank, fromFile, piece, ignoreCastling) => {
-  if (piece instanceof King) {return sensibleKingMoves(board, fromRank, fromFile, piece, ignoreCastling)}
-  if (piece instanceof Queen) {return sensibleQueenMoves(board, fromRank, fromFile, piece)}
-  if (piece instanceof Rook) {return sensibleRookMoves(board, fromRank, fromFile, piece)}
-  if (piece instanceof Bishop) {return sensibleBishopMoves(board, fromRank, fromFile, piece)}
-  if (piece instanceof Knight) {return sensibleKnightMoves(board, fromRank, fromFile, piece)}
-  if (piece instanceof Pawn) {return sensiblePawnMoves(board, fromRank, fromFile, piece)}
-}
-
-
-const sensibleKingMoves = (board, fromRank, fromFile, piece, ignoreCastling = false) => {
-  let moves = []
-  for (let i = -1; i <= 1; i++) {
-    for (let j = -1; j <= 1; j++) {
-      let destinationRank = fromRank + i
-      let destinationFile = fromFile + j
-        if (canLandOn(board, destinationRank, destinationFile, piece)) {
-          moves.push([destinationRank, destinationFile])
-        }
-    }
-  }
-
-  if (!ignoreCastling) {  
-    moves = moves.concat(castlingMoves(board, piece))
-  }
-
-  return moves
-}
-
-
-const sensibleKnightMoves = (board, fromRank, fromFile, piece) => {
-  let moves = []
-  for (let i = -2; i <= 2; i++) {
-    for (let j = -2; j <= 2; j++) {
-
-      if (i !== 0 && j !== 0 && Math.abs(i) !== Math.abs(j)) {
-        let destinationRank = fromRank + i
-        let destinationFile = fromFile + j
-
-        if (canLandOn(board, destinationRank, destinationFile, piece)) {
-          moves.push([destinationRank, destinationFile])
-        }
-      }
-    }
-  }
-  return moves
-}
-
-
-const sensiblePawnMoves = (board, fromRank, fromFile, piece) => {
-  let moves = []
-
-  // normal movement
-  if (canLandOn(board, fromRank - piece.color, fromFile, piece, true)) {
-    moves.push([fromRank - piece.color, fromFile])
-  }
-
-  // initial two jump movement
-  if (fromRank === (piece.color === 1 ? 6 : 1) && canLandOn(board, fromRank - piece.color, fromFile, piece, true)
-      && canLandOn(board, fromRank - 2 * piece.color, fromFile, piece, true)) {
-    moves.push([fromRank - 2 * piece.color, fromFile])
-  }
-
-  // captures
-  if (canLandOn(board, fromRank - piece.color, fromFile + 1, piece, false, true)) {
-    moves.push([fromRank - piece.color, fromFile + 1])
-  }
-  if (canLandOn(board, fromRank - piece.color, fromFile - 1, piece, false, true)) {
-    moves.push([fromRank - piece.color, fromFile - 1])
-  }  
-
-  // en passant
-  let leftPiece = parsePieceId[board[fromRank][fromFile - 1]]
-  let rightPiece = parsePieceId[board[fromRank][fromFile + 1]]
-  if (leftPiece instanceof Pawn && leftPiece.canTakeByEnPassant) {
-    moves.push([fromRank - piece.color, fromFile - 1])
-  }
-  if (rightPiece instanceof Pawn && rightPiece.canTakeByEnPassant) {
-    moves.push([fromRank - piece.color, fromFile + 1])
-  }
-
-  return moves
-}
-
-
-const sensibleRookMoves = (board, fromRank, fromFile, piece) => {
-  let moves = []
-  
-  // scan four directions
-  let rank = fromRank
-  let file = fromFile
-  while (canLandOn(board, rank + 1, file, piece)) {
-    moves.push([rank + 1, file])
-    if (board[rank + 1][file] === 0) {rank += 1}
-    else {break}
-  }
-  rank = fromRank
-  file = fromFile
-  while (canLandOn(board, rank - 1, file, piece)) {
-    moves.push([rank - 1, file])
-    if (board[rank - 1][file] === 0) {rank -= 1}
-    else {break}
-  }
-  rank = fromRank
-  file = fromFile
-  while (canLandOn(board, rank, file + 1, piece)) {
-    moves.push([rank, file + 1])
-    if (board[rank][file + 1] === 0) {file += 1}
-    else {break}
-  }
-  rank = fromRank
-  file = fromFile
-  while (canLandOn(board, rank, file - 1, piece)) {
-    moves.push([rank, file - 1])
-    if (board[rank][file - 1] === 0) {file -= 1}
-    else {break}
-  }
-
-  return moves
-}
-
-
-const sensibleBishopMoves = (board, fromRank, fromFile, piece) => {
-  let moves = []
-
-  // scan four directions
-  let rank = fromRank
-  let file = fromFile
-  while (canLandOn(board, rank + 1, file + 1, piece)) {
-    moves.push([rank + 1, file + 1])
-    if (board[rank + 1][file + 1] === 0) {rank += 1; file += 1;}
-    else {break}
-  }
-  rank = fromRank
-  file = fromFile
-  while (canLandOn(board, rank - 1, file - 1, piece)) {
-    moves.push([rank - 1, file - 1])
-    if (board[rank - 1][file - 1] === 0) {rank -= 1; file -= 1;}
-    else {break}
-  }
-  rank = fromRank
-  file = fromFile
-  while (canLandOn(board, rank - 1, file + 1, piece)) {
-    moves.push([rank - 1, file + 1])
-    if (board[rank - 1][file + 1] === 0) {rank -= 1; file += 1;}
-    else {break}
-  }
-  rank = fromRank
-  file = fromFile
-  while (canLandOn(board, rank + 1, file - 1, piece)) {
-    moves.push([rank + 1, file - 1])
-    if (board[rank + 1][file - 1] === 0) {rank += 1; file -= 1;}
-    else {break}
-  }
-
-  return moves
-}
-
-
-const sensibleQueenMoves = (board, fromRank, fromFile, piece) => {
-  return sensibleRookMoves(board, fromRank, fromFile, piece)
-        .concat(sensibleBishopMoves(board, fromRank, fromFile, piece))
-}
-
-
-const handleCastling = (piece, board, toRank, toFile) => {
-  if (piece instanceof King || piece instanceof Rook) {
-    piece.haveMoved = true
-  }
-
-  if (piece instanceof King && piece.shortCastlingApproved) {
-    let baseRank = piece.color === 1 ? 7 : 0
-    if (toRank === baseRank && toFile === 6) {
-      // move the appropriate rook
-      board[baseRank][7] = 0
-      board[baseRank][5] = piece.color === 1 ? 4 : 20
-    }
-  }
-
-  if (piece instanceof King && piece.longCastlingApproved) {
-    let baseRank = piece.color === 1 ? 7 : 0
-    if (toRank === baseRank && toFile === 2) {
-      // move the appropriate rook
-      board[baseRank][0] = 0
-      board[baseRank][3] = piece.color === 1 ? 3 : 19
-    }
-  }
-
-  piece.shortCastlingApproved = false
-  piece.longCastlingApproved = false
-
-  return board
-}
-
-
-const handleEnPassant = ({ board, fromRank, fromFile, toRank, toFile, piece }) => {
-  // taken by en passant
-  for (let i = 0; i < 8; i++) {
-    for (let j = 0; j < 8; j++) {
-      let scanningPiece = parsePieceId[board[i][j]]
-      if (scanningPiece instanceof Pawn) {
-        scanningPiece.canTakeByEnPassant = false
-      }
-    }
-  }
-
-  if (piece instanceof Pawn) {
-    if (fromRank === (piece.color === 1 ? 6 : 1) && toRank === (piece.color === 1 ? 4: 3)) {
-      piece.canTakeByEnPassant = true
-    }
-  }
-
-  // takes en passant
-  if (piece instanceof Pawn) {
-    if (fromRank - piece.color === toRank
-       && (fromFile - 1 === toFile || fromFile + 1 === toFile)
-       && board[toRank][toFile] === 0) {
-      board[fromRank][toFile] = 0
-    }
-  }
-}
-
-
-const castlingMoves = (board, piece) => {
-  let moves = []
-  let baseRank = piece.color === 1 ? 7 : 0
-  let shortRook = parsePieceId[board[baseRank][7]]
-  let longRook = parsePieceId[board[baseRank][0]]
-  let castlingRights = true
-
-  // short castling
-  if (!piece.haveMoved && shortRook instanceof Rook && !shortRook.haveMoved) {
-    if (board[baseRank][5] === 0 && board[baseRank][6] === 0) {
-
-        for (let file = 4; file <= 6; file++) {
-
-          let hypotheticalBoard = [[],[],[],[],[],[],[],[]];
-          for (let i=0; i < 8; i++) {
-            for (let j = 0; j < 8; j++) {
-              hypotheticalBoard[i][j] = board[i][j]
-            }
-          }
-          hypotheticalBoard[baseRank][4] = 0
-          hypotheticalBoard[baseRank][file] = parseInt(piece.id)
-          
-          if (inCheck({'board': hypotheticalBoard, 'color': piece.color, 'ignoreCastling': true})) {
-            castlingRights = false
-            break
-          } 
-        }
-        if (castlingRights) {
-          moves.push([baseRank, 6])
-          piece.shortCastlingApproved = true
-        }
-        
-        
-    }
-  }
-
-  // long castling
-  if (!piece.haveMoved && longRook instanceof Rook && !longRook.haveMoved) {
-    if (board[baseRank][1] === 0 && board[baseRank][2] === 0 && board[baseRank][3] === 0) {
-
-        for (let file = 2; file <= 4; file++) {
-
-          let hypotheticalBoard = [[],[],[],[],[],[],[],[]];
-          for (let i=0; i < 8; i++) {
-            for (let j = 0; j < 8; j++) {
-              hypotheticalBoard[i][j] = board[i][j]
-            }
-          }
-          hypotheticalBoard[baseRank][4] = 0
-          hypotheticalBoard[baseRank][file] = parseInt(piece.id)
-          
-          if (inCheck({'board': hypotheticalBoard, 'color': piece.color, 'ignoreCastling': true})) {
-            castlingRights = false
-            break
-          } 
-        }
-        if (castlingRights) {
-          moves.push([baseRank, 2])
-          piece.longCastlingApproved = true
-        }
-        
-        
-    }
-  }
-
-  return moves
-}
-
 // check if this color's king is getting mated
 const isCheckmate= (board, turn) => {
   let allMoves = []
@@ -1154,65 +801,6 @@ const isCheckmate= (board, turn) => {
   return false
 }
 
-
-// check if the color's king is in check
-const inCheck = ({ board, color }) => {
-
-  // find the position of the king
-  let kingId = color === 1 ? 1 : 17
-  let kingRank = -1
-  let kingFile = -1
-  scanningBoard: 
-    for (let rank = 0; rank < 8; rank++) {
-      for (let file = 0; file < 8; file++) {
-        if (board[rank][file] === kingId) {
-          kingRank = rank
-          kingFile = file
-          break scanningBoard
-        }
-      }
-    }
-
-  // check all enemy pieces to see if they can attack my king
-  for (let rank = 0; rank < 8; rank++) {
-    for (let file = 0; file < 8; file++) {
-      let piece = parsePieceId[board[rank][file]]
-      if (piece && piece.color === (-1 * color)) {
-        if (checkMoveSensible({'board': board, 'fromRank': rank, 'fromFile': file,
-          'toRank': kingRank, 'toFile': kingFile, 'piece': piece, 'ignoreCastling': true})) {
-            return true
-          }        
-      }
-    }
-  }
-
-  return false
-}
-
-
-const canLandOn = (board, rank, file, piece, pawnMove, pawnTake) => {
-  if (0 <= rank && rank < 8 && 0 <= file && file < 8) {
-
-    if (pawnMove) {
-      if (board[rank][file] === 0) {return true}
-      else {return false}
-    }
-
-    if (pawnTake) {
-      if (board[rank][file] > 0 && parsePieceId[board[rank][file]].color === (-1 * piece.color)) {
-        return true
-      } else {
-        return false
-      }
-    }
-
-    if (board[rank][file] === 0 || parsePieceId[board[rank][file]].color === (-1 * piece.color)) {
-      return true
-    }
-  }
-  return false
-}
-
 /////////////////////////////////////////////////////////////
 // Aesthetics ///////////////////////////////////////////////
 /////////////////////////////////////////////////////////////
@@ -1220,24 +808,14 @@ const canLandOn = (board, rank, file, piece, pawnMove, pawnTake) => {
 
 const indicatePossibleMoves = (board, rank, file, piece, turn, status) => {
 
-  if (status === PLAYER_TURN) {
-    let moves = possibleMoves(board, rank, file, piece, turn)
+  if (status === 0) {
+      let moves = possibleMoves(board, rank, file, piece, turn)
 
-    for (let i=0; i < moves.length; i++) {
-        document.getElementById(moves[i][0].toString().concat(moves[i][1].toString())).style.backgroundColor = 'red'
-    }
+      for (let i=0; i < moves.length; i++) {
+          document.getElementById(moves[i][0].toString().concat(moves[i][1].toString())).style.backgroundColor = 'red'
+      }
   }
 }
-
-const resetBoardColors = () => {
-  for (let i = 0; i < 8; i++) {
-    for (let j = 0; j < 8; j++) {
-      let id = i.toString().concat(j.toString())
-      document.getElementById(id).style.backgroundColor = (i + j) % 2 === 0 ? '#DFC9CA' : '#2B414D'
-    }
-  }
-}
-
 
 /////////////////////////////////////////////////////////////
 // References ///////////////////////////////////////////////
@@ -1252,94 +830,18 @@ const openingMoveThreshold = 15
 const endgamePieceThreshold = 20
 const endgameCheckmatePieceThreshold = 5
 
-let wk, wq, wr1, wr2, wb1, wb2, wn1, wn2, wp1, wp2, wp3, wp4, wp5, wp6, wp7, wp8;
-let bk, bq, br1, br2, bb1, bb2, bn1, bn2, bp1, bp2, bp3, bp4, bp5, bp6, bp7, bp8;
-let parsePieceId;
-
-const setStartingPieces = () => {
-  wk = new King(1, 1)
-  wq = new Queen(1, 2)
-  wr1 = new Rook(1, 3)
-  wr2 = new Rook(1, 4)
-  wb1 = new Bishop(1, 5, -1)
-  wb2 = new Bishop(1, 6, 1)
-  wn1 = new Knight(1, 7)
-  wn2 = new Knight(1, 8)
-  wp1 = new Pawn(1, 9)
-  wp2 = new Pawn(1, 10)
-  wp3 = new Pawn(1, 11)
-  wp4 = new Pawn(1, 12)
-  wp5 = new Pawn(1, 13)
-  wp6 = new Pawn(1, 14)
-  wp7 = new Pawn(1, 15)
-  wp8 = new Pawn(1, 16)
-
-  bk = new King(-1, 17)
-  bq = new Queen(-1, 18)
-  br1 = new Rook(-1, 19)
-  br2 = new Rook(-1, 20)
-  bb1 = new Bishop(-1, 21, 1)
-  bb2 = new Bishop(-1, 22, -1)
-  bn1 = new Knight(-1, 23)
-  bn2 = new Knight(-1, 24)
-  bp1 = new Pawn(-1, 25)
-  bp2 = new Pawn(-1, 26)
-  bp3 = new Pawn(-1, 27)
-  bp4 = new Pawn(-1, 28)
-  bp5 = new Pawn(-1, 29)
-  bp6 = new Pawn(-1, 30)
-  bp7 = new Pawn(-1, 31)
-  bp8 = new Pawn(-1, 32)
-
-  parsePieceId = [
-    , wk, wq, wr1, wr2, wb1, wb2, wn1, wn2, wp1, wp2, wp3, wp4, wp5, wp6, wp7, wp8,
-    bk, bq, br1, br2, bb1, bb2, bn1, bn2, bp1, bp2, bp3, bp4, bp5, bp6, bp7, bp8
-  ]
-}
-
 setStartingPieces()
+createBoardTemplate()
 
-
-let boardTemplate = []
-for (let i = 0; i < 8; i++) {
-  for (let j = 0; j < 8; j++) {
-    boardTemplate.push({
-      'id': i.toString().concat(j.toString()),
-      'isWhite': (i + j) % 2 === 0 ? true : false,
-    })
-  }
+const gameState = {
+  PLAYER_TURN: 0,
+  WHITE_CHECKMATE: 1,
+  BLACK_CHECKMATE: 2,
+  BLACK_RESIGN: 3,
+  WHITE_RESIGN: 4,
+  STALEMATE: 5,
+  INSUFFICIENT: 6,
+  SELECTING: 7,
+  CHOOSING: 8,
+  ENGINE_TURN: 9
 }
-
-const fileLegend = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
-const rankLegend = ['8', '7', '6', '5', '4', '3', '2', '1']
-
-const startingPosition = [
-  [19, 23, 21, 18, 17, 22, 24, 20],
-  [25, 26, 27, 28, 29, 30, 31, 32],
-  [0, 0, 0, 0, 0, 0, 0, 0],
-  [0, 0, 0, 0, 0, 0, 0, 0],
-  [0, 0, 0, 0, 0, 0, 0, 0],
-  [0, 0, 0, 0, 0, 0, 0, 0],
-  [9, 10, 11, 12, 13, 14, 15, 16],
-  [3, 7, 5, 2, 1, 6, 8, 4]
-]
-
-const endGameMessages = [
-  , 'Checkmate, White Win',
-  'Checkmate, Black Win',
-  'Black Resigns, White Win',
-  'White Resigns, Black Win',
-  'Draw by Stalemate',
-  'Draw by Insufficient Material',
-]
-
-const PLAYER_TURN = 0
-const WHITE_CHECKMATE = 1
-const BLACK_CHECKMATE = 2
-const BLACK_RESIGN = 3
-const WHITE_RESIGN = 4
-const STALEMATE = 5
-const INSUFFICIENT = 6
-const SELECTING = 7
-const CHOOSING = 8
-const ENGINE_TURN = 9
