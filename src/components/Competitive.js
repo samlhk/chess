@@ -14,6 +14,8 @@ import { checkMovePossible, possibleMoves, handleCastling, handleEnPassant, inCh
   boardTemplate, createBoardTemplate,fileLegend, rankLegend, startingPosition, endGameMessages
    } from './util'
 
+let movingPiece = '';
+
 const Competitive = () => {
   const [board, updateBoard] = useState(startingPosition)
 
@@ -47,17 +49,17 @@ const Competitive = () => {
   }
   
   // record the identity of the piece
-  const onDragStart = (e, pieceId) => {
-    e.dataTransfer.setData('piece-id', pieceId)
+  const onDragStart = (pieceId) => {
+    movingPiece = pieceId;
   }
   
   // behavior when dropped onto final cell
   const drop = (toCellId, e, enginePieceId) => {
-    let pieceId
+    let pieceId;
     // player dropping the piece manually
     if (e) {
-      e.preventDefault()
-      pieceId = parseInt(e.dataTransfer.getData('piece-id'))
+      //e.preventDefault()
+      pieceId = parseInt(movingPiece);
       resetBoardColors()
     } 
     // engine created drop piece
@@ -281,7 +283,7 @@ const Competitive = () => {
     }
   }
 
-  const engineMove = async (turn) => {
+  const engineMove = (turn) => {
 
     let [enginePieceId, move] = generateEngineMove(board, turn, moveNumber)
 
@@ -314,9 +316,9 @@ const Competitive = () => {
                       let pieceId = board[parseInt(cellId[0])][parseInt(cellId[1])]
                     if (pieceId > 0) {return (
                     <img src={parsePieceId[pieceId].render()}  alt=''
-                      draggable onDragStart={(e) => {onDragStart(e, pieceId); indicatePossibleMoves(board, 
+                      draggable onDragStart={(e) => {onDragStart(pieceId); indicatePossibleMoves(board, 
                         parseInt(cellId[0]), parseInt(cellId[1]), parsePieceId[pieceId], turn, status)}}
-                      onDragEnd={resetBoardColors} />)}}
+                      onDragEnd={resetBoardColors} className='pointer' />)}}
                       )()}
 
                 </div>)})}
@@ -343,13 +345,13 @@ const Competitive = () => {
                     return (<div id='end-game'>
                               <div>{endGameMessages[status]}</div>
                               <button className='board-control-btn' onClick={resetBoard}>
-                                <i className='fa fa-refresh' />
+                                <i className='fa fa-refresh pointer' />
                               </button>
                             </div>)
                 }
             })()}
             {status !== gameState.ENGINE_TURN && <button className='board-control-btn' onClick={flipBoard}>
-              <i className='fa fa-exchange fa-3x fa-rotate-90'/>
+              <i className='fa fa-exchange fa-3x fa-rotate-90 pointer'/>
             </button>}
           </div>
         </div>

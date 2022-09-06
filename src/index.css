@@ -2,7 +2,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400&display=swap');
 
 :root {
-  --background-color: hsl(179, 29%, 64%);
+  --background-color: #89bebd;
   --cell-dimension: 67px;
 }
 
@@ -141,4 +141,8 @@ img, .piece-block {
   background-color: var(--background-color);
   border: none;
   margin: 2rem 0;
+}
+
+.pointer {
+  cursor: pointer;
 }

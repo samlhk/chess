@@ -274,7 +274,7 @@ const Play = () => {
                   <img src={parsePieceId[pieceId].render()}  alt=''
                     draggable onDragStart={(e) => {onDragStart(pieceId); indicatePossibleMoves(board, 
                       parseInt(cellId[0]), parseInt(cellId[1]), parsePieceId[pieceId], turn, status)}}
-                    onDragEnd={resetBoardColors} />)}}
+                    onDragEnd={resetBoardColors} className='pointer' />)}}
                     )()}
 
               </div>)})}
@@ -299,13 +299,13 @@ const Play = () => {
                   return (<div id='end-game'>
                             <div>{endGameMessages[status]}</div>
                             <button className='board-control-btn' onClick={resetBoard}>
-                              <i className='fa fa-refresh' />
+                              <i className='fa fa-refresh pointer' />
                             </button>
                           </div>)
               }
           })()}
           <button className='board-control-btn' onClick={flipBoard}>
-            <i className='fa fa-exchange fa-3x fa-rotate-90'/>
+            <i className='fa fa-exchange fa-3x fa-rotate-90 pointer'/>
           </button>
         </div>
       </div>
