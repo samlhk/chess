@@ -4,7 +4,9 @@ This is a web chess game made with React.
 
 ## Instructions
 
-Visit this [github pages link](https://samlhk.github.io/chess/) to play the game, currently does not work for touchscreens.
+Visit this [github pages link](https://samlhk.github.io/chess/) to play the game.
+
+Note: Currently does not support touchscreens or Safari. The engine runs in the frontend with javascript, so performance and play speed may vary with different devices.
 
 ## Modes
 
