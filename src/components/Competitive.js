@@ -16,9 +16,6 @@ import { checkMovePossible, possibleMoves, handleCastling, handleEnPassant, inCh
 
 let movingPiece = '';
 
-// todo: touch screen
-// todo: safari -> useeffect becomes uselayouteffect in safari
-
 const Competitive = () => {
   const [board, updateBoard] = useState(startingPosition)
 
