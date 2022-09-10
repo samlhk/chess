@@ -146,3 +146,11 @@ img, .piece-block {
 .pointer {
   cursor: pointer;
 }
+
+.about-container h1 {
+  text-decoration: underline;
+}
+
+.about-container ul {
+  list-style-position: inside;
+}

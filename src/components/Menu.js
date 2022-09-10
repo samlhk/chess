@@ -15,8 +15,10 @@ const Menu = () => {
         <Link to='/competitive'>
           <button className='btn btn-block btn-success'>Competitive</button>
         </Link><br/>
-        
-        <button className='btn btn-block btn-dark'>Coming soon...</button>
+
+        <Link to='/about'>
+          <button className='btn btn-block btn-dark'>About</button>
+        </Link>
 
         <Footer />
     </div>

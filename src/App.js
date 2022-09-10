@@ -2,6 +2,7 @@ import { HashRouter as Router, Route} from 'react-router-dom';
 import Menu from './components/Menu';
 import Play from './components/Play';
 import Competitive from './components/Competitive';
+import About from './components/About';
 
 function App() {
   return (
@@ -13,6 +14,8 @@ function App() {
         <Route path='/play' component={Play}/>
 
         <Route path='/competitive' component={Competitive}/>
+
+        <Route path='/about' component={About}/>
 
       </div>
     </Router>
